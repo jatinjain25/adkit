@@ -13,9 +13,11 @@ object is created PAUSED and the end-to-end automation is dry-run by default.
 
 1. **Never spend without explicit confirmation.** Creating objects is safe (they
    are PAUSED). Two actions actually cost money or go live: `adkit ad activate`
-   (starts ad spend) and `adkit generate` / `automate launch --go` (image and
-   video generation cost a few cents to ~$1.20 each). Before either, state the
-   cost or the fact that it goes live, and get a plain-text "go" from the user.
+   (starts ad spend; it activates the ad AND its parent ad set and campaign,
+   because all three must be ACTIVE for Meta to deliver) and `adkit generate` /
+   `automate launch --go` (image and video generation cost a few cents to
+   ~$1.20 each). Before either, state the cost or the fact that it goes live, and
+   get a plain-text "go" from the user.
 2. **Dry run first.** For `automate launch`, always run without `--go` and show
    the plan before proposing the real run.
 3. **Read-only commands are free to run anytime:** `verify`, every `list`
@@ -35,7 +37,12 @@ fix that before anything else (see docs/setup-token.md).
 - Build by hand: `adkit campaign create` then `adkit adset create --campaign-id <id>` then `adkit creative create` then `adkit ad create --adset-id <id> --creative-id <id>`.
 - Lead-gen (Instant Form): `adkit leadform create` first, then pass `--lead-form-id` to `adkit creative create`.
 - Build everything at once: write a brief (see examples/briefs/example.yaml) and run `adkit automate launch --brief brief.yaml` (dry run), then `--go`.
-- Go live: `adkit ad activate --ad-id <id>` (only after the user confirms).
+- Go live: `adkit ad activate --ad-id <id>` (only after the user confirms). This
+  flips the whole delivery chain (campaign + ad set + ad) ACTIVE so the ad
+  actually serves; other ads in the set stay PAUSED. `adkit ad pause` stops it.
+- Re-running `automate launch --go` after a failure is safe: adkit reuses any
+  campaign/ad set/ad that already exists by name and won't regenerate creative
+  whose file is already on disk, so nothing is duplicated or double-charged.
 
 ## Typical flow you should follow
 
@@ -44,8 +51,8 @@ fix that before anything else (see docs/setup-token.md).
 3. Draft a brief YAML (campaign, ad sets with targeting, ads with copy).
 4. `adkit automate launch --brief brief.yaml` (dry run) and show the plan.
 5. On the user's "go": `adkit automate launch --brief brief.yaml --go`.
-6. Report the created IDs. Remind the user everything is PAUSED and how to
-   activate.
+6. Report the created IDs. Remind the user everything is PAUSED, and that
+   `adkit ad activate --ad-id <id>` takes the whole chain live when they're ready.
 
 Minor budget units matter: budgets are in the account currency's minor units
 (cents on USD), so 5000 = $50.00.

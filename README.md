@@ -55,6 +55,12 @@ Then configure your credentials once:
 cp .env.example .env                # fill in your own values, never commit .env
 ```
 
+adkit looks for `.env` in your current directory (and its parents), then in
+`~/.config/adkit/.env`, so it works the same whether you installed from a clone,
+via `pipx`, or as a Claude Code plugin. Put a `.env` in the project you run adkit
+from, or a user-wide one at `~/.config/adkit/.env`. `ADKIT_ENV=/path/to/.env`
+overrides everything. `adkit verify` prints which file it loaded.
+
 You need a Meta app with a token that has ads and pages scopes, an ad account, and a Page linked to an Instagram account. Walkthrough: [docs/setup-token.md](docs/setup-token.md).
 
 For AI creative generation you also need a `GEMINI_API_KEY` and the [gemskills](https://github.com/b-open-io/gemskills) toolkit. That part is optional; the ad automation works without it. To run adkit as an MCP server, install the `mcp` extra: `pipx install "adkit[mcp]"`, then point your agent at the `adkit-mcp` command.
@@ -78,7 +84,8 @@ adkit automate launch --brief examples/briefs/example.yaml
 # Then build it for real. Everything is created PAUSED:
 adkit automate launch --brief examples/briefs/example.yaml --go
 
-# 5. When you are ready to spend, flip an ad on:
+# 5. When you are ready to spend, go live. This flips the ad AND its parent
+#    ad set and campaign to ACTIVE (all three must be active to deliver):
 adkit ad activate --ad-id <id>
 ```
 
@@ -151,16 +158,16 @@ It exposes tools like `verify`, `search_targeting`, `create_campaign`, `launch_b
 | `adkit verify` | Check token validity, scopes, Page to Instagram link, ad account. |
 | `adkit targeting search` | Look up interest and job-title IDs from Meta's taxonomy. |
 | `adkit generate image \| video \| spend` | Generate AI creative and see spend. |
-| `adkit campaign create \| list` | Create and list campaigns. |
-| `adkit adset create \| list` | Create ad sets with targeting. |
+| `adkit campaign create \| activate \| pause \| list` | Create, toggle, and list campaigns. |
+| `adkit adset create \| activate \| pause \| list` | Create ad sets with targeting; toggle them. |
 | `adkit creative create \| list` | Build image or video creatives. |
-| `adkit ad create \| activate \| pause \| list` | Build and toggle ads. |
+| `adkit ad create \| activate \| pause \| list` | Build ads; `activate` takes the whole ad→set→campaign chain live. |
 | `adkit leadform create \| list` | Create Instant Forms for lead-gen. |
 | `adkit automate launch` | Build a whole campaign from a brief (dry run unless `--go`). |
 
 ## Safety model
 
-- **Nothing spends by accident.** Campaigns, ad sets, and ads are all created PAUSED. Ad delivery starts only when you run `adkit ad activate`.
+- **Nothing spends by accident.** Campaigns, ad sets, and ads are all created PAUSED. A Meta ad only delivers when the ad, its ad set, and its campaign are *all* ACTIVE, so `adkit ad activate` flips the whole chain live in one step (other ads in the set stay PAUSED). Use `--ad-only` to flip just the ad.
 - **Dry run by default.** `automate launch` prints the plan and writes nothing until `--go`.
 - **Costs are surfaced.** `generate` prints an estimate before it runs and logs every call to `creatives/.spend.log`.
 - **Secrets stay local.** All credentials come from `.env` (gitignored). See [SECURITY.md](SECURITY.md).

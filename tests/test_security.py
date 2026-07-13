@@ -67,8 +67,13 @@ def test_activate_ad_blocked_without_opt_in(monkeypatch):
 
 def test_activate_ad_allowed_with_opt_in(monkeypatch):
     monkeypatch.setenv("ADKIT_ALLOW_SPEND", "1")
-    monkeypatch.setattr(mcp_server.core, "set_ad_status", lambda ad_id, status: {"id": ad_id, "status": status})
-    assert mcp_server.activate_ad("ad_1")["status"] == "ACTIVE"
+    # activate_ad drives the whole delivery chain via core.activate_delivery.
+    monkeypatch.setattr(
+        mcp_server.core, "activate_delivery",
+        lambda ad_id: {"activated": [{"level": "ad", "id": ad_id}]},
+    )
+    result = mcp_server.activate_ad("ad_1")
+    assert result["activated"][0]["id"] == "ad_1"
 
 
 def test_confined_path_blocks_traversal(monkeypatch, tmp_path):
