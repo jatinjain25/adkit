@@ -4,6 +4,27 @@ All notable changes to adkit are recorded here. The format follows
 [Keep a Changelog](https://keepachangelog.com/), and adkit uses semantic
 versioning.
 
+## [0.1.1]
+
+Security and reliability hardening.
+
+### Security
+- The Meta access token now travels in the `Authorization: Bearer` header
+  instead of the URL query string, and every error path scrubs the token, so it
+  cannot leak into tracebacks, proxy logs, or CI output.
+- The MCP server refuses money or live actions (`activate_ad`, `generate_image`,
+  `generate_video`, `launch_brief(go=True)`) unless `ADKIT_ALLOW_SPEND=1` is set
+  in the server environment. Enforced server-side.
+- New `ADKIT_GENERATION_DAILY_CAP_USD` sets a hard daily ceiling on AI
+  generation spend, across the CLI and MCP.
+- MCP file tools are confined to the creatives working directory, blocking path
+  traversal (arbitrary file read/write).
+- Added a threat model and supply-chain section to SECURITY.md.
+
+### Added
+- Security regression tests (token header, token scrubbing, spend gate, path
+  confinement, daily cap).
+
 ## [0.1.0]
 
 First public release.

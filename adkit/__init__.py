@@ -8,4 +8,4 @@ Use it three ways:
 
 from . import core  # noqa: F401
 
-__version__ = "0.1.0"
+__version__ = "0.1.1"

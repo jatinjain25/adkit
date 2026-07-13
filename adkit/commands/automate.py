@@ -75,14 +75,19 @@ def launch(brief, go):
         return
 
     click.echo("")
-    result = core.launch_from_brief(
-        spec, go=True,
-        creatives_dir=spec.get("creatives_dir", "creatives"),
-        on_event=lambda m: click.echo(f"  ✓ {m}"),
-    )
+    try:
+        result = core.launch_from_brief(
+            spec, go=True,
+            creatives_dir=spec.get("creatives_dir", "creatives"),
+            on_event=lambda m: click.echo(f"  ✓ {m}"),
+        )
+    except core.LaunchError as e:
+        raise SystemExit(f"\n✗ {e}")
+
     created = result["created"]
     click.echo(
         f"\n✓ Built campaign {created['campaign_id']}: "
         f"{len(created['ad_ids'])} ads. Everything is PAUSED.\n"
-        f"Review in Ads Manager, then flip on with: adkit ad activate --ad-id <id>"
+        f"Review in Ads Manager, then go live with the whole delivery chain:\n"
+        f"  adkit ad activate --ad-id <id>   (activates the ad, its ad set, and its campaign)"
     )

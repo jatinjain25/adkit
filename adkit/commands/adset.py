@@ -107,6 +107,22 @@ def create(
     click.echo(f"    targeting: {json.dumps(result['targeting'], indent=2)}")
 
 
+@adset.command("activate")
+@click.option("--adset-id", required=True, help="Ad set id to set ACTIVE.")
+def activate(adset_id):
+    """Set an ad set ACTIVE. Its campaign and the ad itself must also be ACTIVE to deliver."""
+    core.set_adset_status(adset_id, "ACTIVE")
+    click.echo(f"  ✓ adset {adset_id} is now ACTIVE")
+
+
+@adset.command("pause")
+@click.option("--adset-id", required=True, help="Ad set id to pause (stops delivery for its ads).")
+def pause(adset_id):
+    """Pause an ad set. This stops delivery for every ad under it."""
+    core.set_adset_status(adset_id, "PAUSED")
+    click.echo(f"  ✓ adset {adset_id} is now PAUSED")
+
+
 @adset.command("list")
 @click.option(
     "--account",

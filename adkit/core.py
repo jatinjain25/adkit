@@ -25,6 +25,16 @@ from . import config, graph
 Emit = Callable[[str], None]
 
 
+class LaunchError(Exception):
+    """A brief launch failed partway. `created` holds the ids built before the
+    failure so callers can report or clean them up. Nothing is ever left
+    spending: every object adkit creates is PAUSED."""
+
+    def __init__(self, message: str, *, created: dict):
+        super().__init__(message)
+        self.created = created
+
+
 def _noop(_msg: str) -> None:
     pass
 
@@ -80,10 +90,12 @@ def verify_credentials(account: str | None = None, page: str | None = None) -> d
     Returns a structured report; raises nothing for the normal 'unhealthy'
     cases so callers can present the findings.
     """
+    env_file = config.find_env_file()
     token = config.require("META_ACCESS_TOKEN")
     dbg = graph.get("debug_token", {"input_token": token}).get("data", {})
     scopes = dbg.get("scopes", [])
     report: dict = {
+        "env_file": str(env_file) if env_file else None,
         "token_valid": bool(dbg.get("is_valid")),
         "expires_at": dbg.get("expires_at"),
         "scopes": scopes,
@@ -105,10 +117,15 @@ def verify_credentials(account: str | None = None, page: str | None = None) -> d
         ad_account_id,
         {"fields": "name,account_status,currency,timezone_name,amount_spent,balance"},
     )
+    # Meta account_status: 1 = active. Anything else (2 disabled, 3 unsettled,
+    # 7 pending risk review, 9 in grace period, ...) means you cannot deliver,
+    # so it must fail the health check even if the token and links are fine.
+    account_status = acct.get("account_status")
     report["ad_account"] = {
         "id": ad_account_id,
         "name": acct.get("name"),
-        "status": acct.get("account_status"),
+        "status": account_status,
+        "active": account_status == 1,
         "currency": acct.get("currency"),
         "timezone": acct.get("timezone_name"),
     }
@@ -116,6 +133,7 @@ def verify_credentials(account: str | None = None, page: str | None = None) -> d
         report["token_valid"]
         and not report["missing_scopes"]
         and report["page"]["instagram_linked"]
+        and report["ad_account"]["active"]
     )
     return report
 
@@ -371,6 +389,41 @@ def set_ad_status(ad_id: str, status: str) -> dict:
     return {"id": ad_id, "status": status.upper()}
 
 
+def set_adset_status(adset_id: str, status: str) -> dict:
+    graph.post(adset_id, data={"status": status.upper()})
+    return {"id": adset_id, "status": status.upper()}
+
+
+def set_campaign_status(campaign_id: str, status: str) -> dict:
+    graph.post(campaign_id, data={"status": status.upper()})
+    return {"id": campaign_id, "status": status.upper()}
+
+
+def activate_delivery(ad_id: str) -> dict:
+    """Actually make an ad deliver.
+
+    A Meta ad only serves when its own status AND its parent ad set AND its
+    parent campaign are all ACTIVE. adkit builds everything PAUSED, so flipping
+    just the ad on would leave it stuck behind two paused parents and it would
+    never spend. This walks up from the ad and activates the whole chain, which
+    is what "go live" actually means. Other ads in the same ad set stay PAUSED,
+    so this only starts the one ad you named.
+    """
+    parents = graph.get(ad_id, {"fields": "adset_id,campaign_id"})
+    campaign_id = parents.get("campaign_id")
+    adset_id = parents.get("adset_id")
+    activated = []
+    if campaign_id:
+        set_campaign_status(campaign_id, "ACTIVE")
+        activated.append({"level": "campaign", "id": campaign_id})
+    if adset_id:
+        set_adset_status(adset_id, "ACTIVE")
+        activated.append({"level": "adset", "id": adset_id})
+    set_ad_status(ad_id, "ACTIVE")
+    activated.append({"level": "ad", "id": ad_id})
+    return {"ad_id": ad_id, "activated": activated}
+
+
 def list_ads(account: str | None = None, adset_id: str | None = None, limit: int = 25) -> list[dict]:
     ad_account_id = config.ad_account(account)
     path = f"{adset_id}/ads" if adset_id else f"{ad_account_id}/ads"
@@ -418,9 +471,10 @@ def create_lead_form(
         }),
         "follow_up_action_url": thank_you_url or privacy_url,
         "is_optimized_for_quality": "true",
-        "access_token": token,
     }
-    resp = graph.post(f"{page_id}/leadgen_forms", data=data)
+    # Lead forms are Page-owned, so they must be written with the Page token,
+    # passed via the Authorization header (see graph._request), not the body.
+    resp = graph.post(f"{page_id}/leadgen_forms", data=data, access_token=token)
     return {"id": resp.get("id"), "name": name}
 
 
@@ -458,20 +512,33 @@ def plan_brief(brief: dict) -> dict:
 
 
 def _generate_asset(ad: dict, creatives_dir: Path, emit: Emit) -> None:
-    """Run the ad's `generate` block (if any) and set ad['image'] or ad['video']."""
+    """Run the ad's `generate` block (if any) and set ad['image'] or ad['video'].
+
+    If the target file already exists we reuse it instead of regenerating, so a
+    re-run after a partial failure never pays for the same creative twice.
+    """
     gen = ad.get("generate")
     if not gen:
         return
-    from . import creative_gen  # imported lazily so the ads API works without it
     kind = gen.get("type", "image")
     slug = (ad.get("name", "creative")).lower().replace(" ", "_")
     if kind == "image":
         out = creatives_dir / f"{slug}.png"
+        if out.exists():
+            ad["image"] = str(out)
+            emit(f"reusing existing image {out} (no spend)")
+            return
+        from . import creative_gen  # imported lazily so the ads API works without it
         creative_gen.generate_image(gen["prompt"], out, aspect=gen.get("aspect", "1:1"), size=gen.get("size", "2K"))
         ad["image"] = str(out)
         emit(f"generated image: {out}")
     elif kind == "video":
         out = creatives_dir / f"{slug}.mp4"
+        if out.exists():
+            ad["video"] = str(out)
+            emit(f"reusing existing video {out} (no spend)")
+            return
+        from . import creative_gen
         creative_gen.generate_video(
             gen["prompt"], out,
             image=Path(gen["seed_image"]) if gen.get("seed_image") else None,
@@ -483,18 +550,41 @@ def _generate_asset(ad: dict, creatives_dir: Path, emit: Emit) -> None:
         raise ValueError(f"Unknown generate.type: {kind!r} (use image or video).")
 
 
+def _find_by_name(rows: list[dict], name: str) -> str | None:
+    """Return the id of the first row whose name matches, else None."""
+    for row in rows:
+        if row.get("name") == name:
+            return row.get("id")
+    return None
+
+
 def launch_from_brief(
     brief: dict,
     *,
     go: bool = False,
     creatives_dir: str | Path = "creatives",
+    reuse: bool = True,
     on_event: Emit | None = None,
 ) -> dict:
     """Build a whole campaign from a brief.
 
     go=False returns the plan and creates nothing (a dry run).
-    go=True creates everything PAUSED, generating any declared creatives first.
-    on_event, if given, receives progress strings.
+
+    go=True builds everything PAUSED. It is written to be safe to re-run:
+
+      * Idempotent by name (reuse=True, the default). A campaign / ad set / ad /
+        lead form whose name already exists is reused instead of duplicated, so
+        re-running after a mid-way failure resumes where it stopped rather than
+        creating a second copy of everything.
+      * Cheap-fail-first. The campaign and ad-set shells (free, PAUSED) are
+        created before any creative is generated, so a bad objective or budget
+        fails before you spend a cent on media.
+      * No double spend on creative. `generate` blocks skip generation when the
+        output file already exists.
+
+    on_event, if given, receives progress strings. On any failure part-way
+    through, the exception carries the ids created so far so nothing is orphaned
+    silently.
     """
     emit = on_event or _noop
     plan = plan_brief(brief)
@@ -509,59 +599,88 @@ def launch_from_brief(
     objective = camp.get("objective", "OUTCOME_TRAFFIC").upper()
     is_leadgen = objective == "OUTCOME_LEADS"
 
-    for aset in brief.get("adsets", []):
-        for ad in aset.get("ads", []):
-            _generate_asset(ad, creatives_dir, emit)
-
-    campaign = create_campaign(
-        camp["name"], objective=objective, daily_budget=camp.get("daily_budget"),
-        special_ad_category=camp.get("special_ad_category", "NONE"), account=account,
-    )
-    emit(f"campaign {campaign['id']}")
-
-    lead_form_id = None
-    if is_leadgen and brief.get("lead_form"):
-        lf = brief["lead_form"]
-        form = create_lead_form(
-            lf["name"], lf["privacy_url"],
-            privacy_link_text=lf.get("privacy_link_text", "Privacy Policy"),
-            locale=lf.get("locale", "en_US"), headline=lf.get("headline", "Get in touch"),
-            description=lf.get("description", ""), thank_you_title=lf.get("thank_you_title", "Thanks!"),
-            thank_you_url=lf.get("thank_you_url"), page=page,
-        )
-        lead_form_id = form["id"]
-        emit(f"lead form {lead_form_id}")
-
-    created_ads = []
-    for aset in brief.get("adsets", []):
-        adset = create_adset(
-            aset["name"], campaign["id"], aset["daily_budget"],
-            targeting=json.loads(Path(aset["targeting_json"]).read_text()) if aset.get("targeting_json") else None,
-            countries=aset.get("countries", ["US"]), age_min=aset.get("age_min", 25), age_max=aset.get("age_max", 55),
-            interest_ids=aset.get("interest_ids", ""),
-            optimization_goal=aset.get("optimization_goal", "LEAD_GENERATION" if is_leadgen else "LINK_CLICKS"),
-            billing_event=aset.get("billing_event", "IMPRESSIONS"),
-            destination_type=aset.get("destination_type", "ON_AD" if is_leadgen else "WEBSITE"),
-            bid_strategy=aset.get("bid_strategy", "LOWEST_COST_WITHOUT_CAP"),
-            account=account, page=page,
-        )
-        emit(f"adset {adset['id']} ({aset['name']})")
-        for ad in aset.get("ads", []):
-            creative = create_creative(
-                ad.get("name", ad["headline"]), ad["message"], ad["headline"],
-                image=ad.get("image"), image_hash=ad.get("image_hash"),
-                video=ad.get("video"), video_id=ad.get("video_id"),
-                thumbnail=ad.get("thumbnail"), thumbnail_hash=ad.get("thumbnail_hash"),
-                description=ad.get("description"), link=ad.get("link"),
-                cta=ad.get("cta", "LEARN_MORE"), lead_form_id=lead_form_id,
-                page=page, ig_actor=ig_actor, account=account,
+    created: dict = {"campaign_id": None, "lead_form_id": None, "ad_ids": []}
+    try:
+        existing_campaign = _find_by_name(list_campaigns(account, limit=200), camp["name"]) if reuse else None
+        if existing_campaign:
+            campaign = {"id": existing_campaign}
+            emit(f"reusing campaign {existing_campaign} ({camp['name']})")
+        else:
+            campaign = create_campaign(
+                camp["name"], objective=objective, daily_budget=camp.get("daily_budget"),
+                special_ad_category=camp.get("special_ad_category", "NONE"), account=account,
             )
-            made = create_ad(ad.get("name", "ad"), adset["id"], creative["id"], account=account)
-            emit(f"ad {made['id']} (creative {creative['id']})")
-            created_ads.append(made["id"])
+            emit(f"campaign {campaign['id']}")
+        created["campaign_id"] = campaign["id"]
 
-    return {
-        "mode": "live",
-        "plan": plan,
-        "created": {"campaign_id": campaign["id"], "lead_form_id": lead_form_id, "ad_ids": created_ads},
-    }
+        lead_form_id = None
+        if is_leadgen and brief.get("lead_form"):
+            lf = brief["lead_form"]
+            existing_form = _find_by_name(list_lead_forms(page, limit=200), lf["name"]) if reuse else None
+            if existing_form:
+                lead_form_id = existing_form
+                emit(f"reusing lead form {lead_form_id}")
+            else:
+                form = create_lead_form(
+                    lf["name"], lf["privacy_url"],
+                    privacy_link_text=lf.get("privacy_link_text", "Privacy Policy"),
+                    locale=lf.get("locale", "en_US"), headline=lf.get("headline", "Get in touch"),
+                    description=lf.get("description", ""), thank_you_title=lf.get("thank_you_title", "Thanks!"),
+                    thank_you_url=lf.get("thank_you_url"), page=page,
+                )
+                lead_form_id = form["id"]
+                emit(f"lead form {lead_form_id}")
+        created["lead_form_id"] = lead_form_id
+
+        for aset in brief.get("adsets", []):
+            existing_adset = (
+                _find_by_name(list_adsets(account, campaign["id"], limit=200), aset["name"]) if reuse else None
+            )
+            if existing_adset:
+                adset = {"id": existing_adset}
+                emit(f"reusing adset {existing_adset} ({aset['name']})")
+            else:
+                adset = create_adset(
+                    aset["name"], campaign["id"], aset["daily_budget"],
+                    targeting=json.loads(Path(aset["targeting_json"]).read_text()) if aset.get("targeting_json") else None,
+                    countries=aset.get("countries", ["US"]), age_min=aset.get("age_min", 25),
+                    age_max=aset.get("age_max", 55), interest_ids=aset.get("interest_ids", ""),
+                    optimization_goal=aset.get("optimization_goal", "LEAD_GENERATION" if is_leadgen else "LINK_CLICKS"),
+                    billing_event=aset.get("billing_event", "IMPRESSIONS"),
+                    destination_type=aset.get("destination_type", "ON_AD" if is_leadgen else "WEBSITE"),
+                    bid_strategy=aset.get("bid_strategy", "LOWEST_COST_WITHOUT_CAP"),
+                    account=account, page=page,
+                )
+                emit(f"adset {adset['id']} ({aset['name']})")
+
+            existing_ads = list_ads(account, adset["id"], limit=200) if reuse else []
+            for ad in aset.get("ads", []):
+                ad_name = ad.get("name", ad["headline"])
+                already = _find_by_name(existing_ads, ad_name) if reuse else None
+                if already:
+                    emit(f"reusing ad {already} ({ad_name}); skipping generation")
+                    created["ad_ids"].append(already)
+                    continue
+                # Only now (ad set exists, ad does not) do we spend on creative.
+                _generate_asset(ad, creatives_dir, emit)
+                creative = create_creative(
+                    ad_name, ad["message"], ad["headline"],
+                    image=ad.get("image"), image_hash=ad.get("image_hash"),
+                    video=ad.get("video"), video_id=ad.get("video_id"),
+                    thumbnail=ad.get("thumbnail"), thumbnail_hash=ad.get("thumbnail_hash"),
+                    description=ad.get("description"), link=ad.get("link"),
+                    cta=ad.get("cta", "LEARN_MORE"), lead_form_id=lead_form_id,
+                    page=page, ig_actor=ig_actor, account=account,
+                )
+                made = create_ad(ad_name, adset["id"], creative["id"], account=account)
+                emit(f"ad {made['id']} (creative {creative['id']})")
+                created["ad_ids"].append(made["id"])
+    except Exception as exc:
+        raise LaunchError(
+            f"Brief launch failed partway: {exc}\n"
+            f"Created so far (all PAUSED, nothing is spending): {json.dumps(created)}\n"
+            "Fix the cause and re-run the same brief; adkit reuses what already exists.",
+            created=created,
+        ) from exc
+
+    return {"mode": "live", "plan": plan, "created": created}

@@ -35,11 +35,31 @@ def create(account, name, adset_id, creative_id, status):
 
 
 @ad.command("activate")
-@click.option("--ad-id", required=True, help="Ad id to flip ACTIVE (starts spending).")
-def activate(ad_id):
-    """Set an ad's status to ACTIVE."""
-    core.set_ad_status(ad_id, "ACTIVE")
-    click.echo(f"  ✓ ad {ad_id} is now ACTIVE")
+@click.option("--ad-id", required=True, help="Ad id to make live (starts spending).")
+@click.option(
+    "--ad-only",
+    is_flag=True,
+    default=False,
+    help="Flip only this ad ACTIVE and leave its ad set / campaign as-is. "
+    "By default adkit activates the whole delivery chain so the ad actually runs.",
+)
+def activate(ad_id, ad_only):
+    """Make an ad deliver.
+
+    A Meta ad only serves when the ad, its ad set, AND its campaign are all
+    ACTIVE. Since adkit builds everything PAUSED, this activates the whole chain
+    by default so the ad genuinely goes live. Other ads in the ad set stay
+    PAUSED.
+    """
+    if ad_only:
+        core.set_ad_status(ad_id, "ACTIVE")
+        click.echo(f"  ✓ ad {ad_id} is now ACTIVE (parents unchanged; it will only")
+        click.echo("    deliver if its ad set and campaign are also ACTIVE)")
+        return
+    result = core.activate_delivery(ad_id)
+    for step in result["activated"]:
+        click.echo(f"  ✓ {step['level']} {step['id']} is now ACTIVE")
+    click.echo("  → ad is live and can start spending. Pause with: adkit ad pause --ad-id " + ad_id)
 
 
 @ad.command("pause")

@@ -78,6 +78,43 @@ def _log_spend(kind: str, cost: float, out: Path) -> None:
         fh.write(line)
 
 
+def _today_spend() -> float:
+    """Sum today's logged generation spend (UTC), from the local spend log."""
+    path = _spend_log_path()
+    if not path.exists():
+        return 0.0
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    total = 0.0
+    for line in path.read_text().splitlines():
+        parts = line.split()
+        if len(parts) >= 3 and parts[0].startswith(today) and parts[2].startswith("$"):
+            try:
+                total += float(parts[2][1:])
+            except ValueError:
+                pass
+    return total
+
+
+def _enforce_daily_cap(pending_cost: float) -> None:
+    """If ADKIT_GENERATION_DAILY_CAP_USD is set, refuse a generation that would
+    push today's total generation spend over the cap. Applies to every path
+    (CLI and MCP), so it is a hard local ceiling on generation cost."""
+    raw = os.environ.get("ADKIT_GENERATION_DAILY_CAP_USD", "").strip()
+    if not raw:
+        return
+    try:
+        cap = float(raw)
+    except ValueError:
+        raise CreativeGenError(f"ADKIT_GENERATION_DAILY_CAP_USD is not a number: {raw!r}")
+    spent = _today_spend()
+    if spent + pending_cost > cap:
+        raise CreativeGenError(
+            f"Daily generation cap reached: ${spent:.2f} spent today, this call adds "
+            f"~${pending_cost:.2f}, cap is ${cap:.2f}. Raise ADKIT_GENERATION_DAILY_CAP_USD "
+            "or wait until tomorrow (UTC)."
+        )
+
+
 def _run(script: Path, args: list[str], extra_env: dict[str, str]) -> None:
     env = dict(os.environ)
     env["GEMINI_API_KEY"] = config.require("GEMINI_API_KEY")
@@ -101,6 +138,7 @@ def generate_image(
     size: str = "2K",
 ) -> Path:
     """Generate a still image from a text prompt. Returns the output path."""
+    _enforce_daily_cap(COST_IMAGE)
     out = out.resolve()
     out.parent.mkdir(parents=True, exist_ok=True)
     script = _gemskills_root() / "skills/generate-image/scripts/generate.ts"
@@ -129,6 +167,8 @@ def generate_video(
     the higher-fidelity model only when a draft has already validated the shot.
     Returns the output path.
     """
+    cost = COST_VIDEO.get(duration, COST_VIDEO[8])
+    _enforce_daily_cap(cost)
     out = out.resolve()
     out.parent.mkdir(parents=True, exist_ok=True)
     script = _gemskills_root() / "skills/generate-video/scripts/generate.ts"
@@ -143,7 +183,6 @@ def generate_video(
         args += ["--input", str(Path(image).resolve())]
     model = FAST_VIDEO_MODEL if fast else QUALITY_VIDEO_MODEL
     _run(script, args, extra_env={"GEMINI_VIDEO_MODEL": model})
-    cost = COST_VIDEO.get(duration, COST_VIDEO[8])
     _log_spend(f"video-{duration}s{'-fast' if fast else ''}", cost, out)
     return out
 

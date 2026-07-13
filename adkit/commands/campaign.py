@@ -59,6 +59,22 @@ def create(account, name, objective, status, daily_budget, special_ad_category):
         click.echo(f"    daily_budget={daily_budget} (minor units, e.g. cents)")
 
 
+@campaign.command("activate")
+@click.option("--campaign-id", required=True, help="Campaign id to set ACTIVE.")
+def activate(campaign_id):
+    """Set a campaign ACTIVE. Ads still need their ad set and ad ACTIVE to deliver."""
+    core.set_campaign_status(campaign_id, "ACTIVE")
+    click.echo(f"  ✓ campaign {campaign_id} is now ACTIVE")
+
+
+@campaign.command("pause")
+@click.option("--campaign-id", required=True, help="Campaign id to pause (stops all delivery under it).")
+def pause(campaign_id):
+    """Pause a campaign. This stops delivery for every ad set and ad under it."""
+    core.set_campaign_status(campaign_id, "PAUSED")
+    click.echo(f"  ✓ campaign {campaign_id} is now PAUSED")
+
+
 @campaign.command("list")
 @click.option(
     "--account",

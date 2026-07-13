@@ -18,6 +18,7 @@ def verify(account, page):
     """Smoke test credentials: token validity, scopes, Page to IG link, ad account access."""
     r = core.verify_credentials(account=account, page=page)
 
+    click.echo(f"→ Config loaded from: {r['env_file'] or '(no .env found; using process env)'}")
     click.echo(f"→ Token: valid={r['token_valid']}  expires_at={r['expires_at']} (0 = never)")
     click.echo(f"  scopes ({len(r['scopes'])}): {', '.join(r['scopes']) if r['scopes'] else '(none)'}")
     if r["missing_scopes"]:
@@ -38,5 +39,7 @@ def verify(account, page):
     click.echo(
         f"  status={acct['status']}  currency={acct['currency']}  tz={acct['timezone']}"
     )
+    if not acct["active"]:
+        click.echo("  ✗ Ad account is not active (status != 1). It cannot deliver ads until resolved.")
 
     click.echo(f"\n{'All checks passed.' if r['healthy'] else 'Some checks need attention (see above).'}")
