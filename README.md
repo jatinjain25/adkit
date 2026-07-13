@@ -21,6 +21,28 @@ Launching Meta ads through the Marketing API is fiddly: tokens and scopes, the P
 
 It also plugs straight into **Claude Code**, so you can run your ads by talking to an agent, with cost and safety guardrails built in.
 
+## Try it in 30 seconds (no account needed)
+
+```bash
+pipx install meta-adkit     # or: pip install meta-adkit
+adkit demo
+```
+
+`adkit demo` prints the exact plan adkit would build from a brief. It writes nothing, calls nothing, and needs no Meta account or API keys, so you can see the whole flow before you set anything up:
+
+```
+=== adkit demo [DRY RUN] ===
+objective=OUTCOME_TRAFFIC
+campaign: Example | TOF | Traffic
+  adset: Agent builders  budget=2500 (minor units)
+    ad: Expensive chatbot  [image]  cta=LEARN_MORE
+    ad: Buy vs build  [image]  cta=SIGN_UP
+```
+
+When you're ready to run it on a real account, `adkit init my-brief.yaml` writes a starter brief and `adkit verify` walks you through connecting Meta.
+
+> The command is `adkit`; the PyPI package is `meta-adkit` (the name `adkit` was already taken).
+
 ## Why adkit
 
 - **One brief, one command.** Describe a campaign in YAML and `adkit automate launch` builds the campaign, ad sets, creatives, and ads for you.
@@ -36,7 +58,7 @@ Pick whichever fits how you want to use it.
 **As a command-line tool** (isolated, recommended):
 
 ```bash
-pipx install "adkit[yaml]"          # or: uvx --from "adkit[yaml]" adkit --help
+pipx install "meta-adkit[yaml]"     # or: uvx --from "meta-adkit[yaml]" adkit --help
 ```
 
 **As a library or to hack on it:**
@@ -55,7 +77,9 @@ pip install -e ".[dev]"             # dev extra = yaml + mcp + pytest + ruff
 /plugin install adkit
 ```
 
-Then configure your credentials once:
+## Connect your Meta account (when you're ready to go live)
+
+Everything above works with no account. To build on a real ad account, configure your credentials once:
 
 ```bash
 cp .env.example .env                # fill in your own values, never commit .env
@@ -69,7 +93,7 @@ overrides everything. `adkit verify` prints which file it loaded.
 
 You need a Meta app with a token that has ads and pages scopes, an ad account, and a Page linked to an Instagram account. Walkthrough: [docs/setup-token.md](docs/setup-token.md).
 
-For AI creative generation you also need a `GEMINI_API_KEY` and the [gemskills](https://github.com/b-open-io/gemskills) toolkit. That part is optional; the ad automation works without it. To run adkit as an MCP server, install the `mcp` extra: `pipx install "adkit[mcp]"`, then point your agent at the `adkit-mcp` command.
+For AI creative generation you also need a `GEMINI_API_KEY` and the [gemskills](https://github.com/b-open-io/gemskills) toolkit. That part is optional; the ad automation works without it. To run adkit as an MCP server, install the `mcp` extra: `pipx install "meta-adkit[mcp]"`, then point your agent at the `adkit-mcp` command.
 
 ## 60-second tour
 
@@ -148,19 +172,38 @@ The CLI and the MCP server are both thin layers over these functions, so there i
 
 ## Use it as an MCP server
 
-Any MCP-capable agent can drive adkit:
+Any MCP-capable agent (Claude Code, Cursor, Claude Desktop, or your own app) can drive adkit. Install the `mcp` extra so the `adkit-mcp` command exists:
 
 ```bash
-pipx install "adkit[mcp]"
-adkit-mcp            # runs the server over stdio; point your MCP client at this command
+pipx install "meta-adkit[mcp]"
 ```
 
-It exposes tools like `verify`, `search_targeting`, `create_campaign`, `launch_brief`, and `generate_image`. The tool descriptions carry the same safety notes: creation is PAUSED, and the tools that cost money or go live say so.
+**Claude Code** — one line:
+
+```bash
+claude mcp add adkit -- adkit-mcp
+```
+
+**Any MCP client** — drop this into your client's config (e.g. `~/.cursor/mcp.json`, or Claude Desktop's config):
+
+```json
+{
+  "mcpServers": {
+    "adkit": {
+      "command": "adkit-mcp"
+    }
+  }
+}
+```
+
+It exposes tools like `verify`, `search_targeting`, `create_campaign`, `launch_brief`, and `generate_image`. The tool descriptions carry the same safety notes: creation is PAUSED, and the tools that cost money or go live say so. Actions that spend money or start delivery (`activate_ad`, `generate_image`, `generate_video`, `launch_brief --go`) are refused unless the operator sets `ADKIT_ALLOW_SPEND=1` in the server's environment, so an auto-approving client or a prompt injection can't spend on your behalf.
 
 ## Commands
 
 | Command | What it does |
 | --- | --- |
+| `adkit demo` | Dry-run the whole flow with no account or keys. Start here. |
+| `adkit init [brief.yaml]` | Write a starter campaign brief you can edit. |
 | `adkit verify` | Check token validity, scopes, Page to Instagram link, ad account. |
 | `adkit targeting search` | Look up interest and job-title IDs from Meta's taxonomy. |
 | `adkit generate image \| video \| spend` | Generate AI creative and see spend. |
@@ -184,4 +227,8 @@ Issues and pull requests are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md). ad
 
 ## Acknowledgements
 
-AI creative generation is powered by [gemskills](https://github.com/b-open-io/gemskills) (Gemini images and Veo video). Built by people who got tired of clicking through Ads Manager.
+AI creative generation is powered by [gemskills](https://github.com/b-open-io/gemskills) (Gemini images and Veo video).
+
+---
+
+Built by [Jatin Jain](https://github.com/jatinjain25), who got tired of clicking through Ads Manager. If adkit saved you some clicks, a star helps others find it.

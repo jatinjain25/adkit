@@ -6,7 +6,7 @@ just the CLI. Every tool is a thin call into `adkit.core`, so behavior is
 identical to the CLI.
 
 Run it:
-    adkit-mcp                 # after `pip install "adkit[mcp]"`
+    adkit-mcp                 # after `pip install "meta-adkit[mcp]"`
 
 Register it with an MCP client by pointing the client at the `adkit-mcp`
 command over stdio.
@@ -31,7 +31,7 @@ try:
 except ImportError:  # pragma: no cover
     raise SystemExit(
         "The MCP server needs the 'mcp' package. Install it with:\n"
-        "  pip install \"adkit[mcp]\""
+        "  pip install \"meta-adkit[mcp]\""
     )
 
 mcp = FastMCP("adkit")

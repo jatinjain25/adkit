@@ -1,6 +1,6 @@
 {
   "name": "adkit",
-  "owner": { "name": "adkit contributors" },
+  "owner": { "name": "Jatin Jain", "url": "https://github.com/jatinjain25" },
   "metadata": {
     "description": "adkit: Meta ads automation for Claude Code.",
     "version": "0.1.1"

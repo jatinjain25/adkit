@@ -68,8 +68,15 @@ GRAPH_VERSION = os.environ.get("META_API_VERSION", "v21.0")
 def require(name: str) -> str:
     val = os.environ.get(name)
     if not val:
+        loaded = find_env_file()
+        where = f"adkit loaded {loaded}" if loaded else "adkit found no .env file"
         raise SystemExit(
-            f"Missing required env var: {name}. Set it in .env (see .env.example)."
+            f"Missing required setting: {name}.\n"
+            f"{where}. adkit looks for .env in the current directory (and its "
+            "parents), then ~/.config/adkit/.env; ADKIT_ENV=/path/to/.env overrides.\n"
+            "Copy .env.example to one of those, fill in your values, and see "
+            "docs/setup-token.md for how to get a Meta token.\n"
+            "No account yet? Try `adkit demo` first, it needs no credentials."
         )
     return val
 

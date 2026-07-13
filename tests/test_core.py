@@ -14,6 +14,22 @@ def test_ad_account_normalizes_prefix():
     assert config.ad_account("act_123456") == "act_123456"
 
 
+def test_find_env_file_prefers_cwd_then_explicit(monkeypatch, tmp_path):
+    # A .env in the working directory is discovered (the pipx/plugin case, where
+    # there is no repo checkout to read from).
+    cwd_env = tmp_path / ".env"
+    cwd_env.write_text("META_ACCESS_TOKEN=from_cwd\n")
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.delenv("ADKIT_ENV", raising=False)
+    assert config.find_env_file() == cwd_env
+
+    # ADKIT_ENV overrides everything.
+    explicit = tmp_path / "custom.env"
+    explicit.write_text("META_ACCESS_TOKEN=from_explicit\n")
+    monkeypatch.setenv("ADKIT_ENV", str(explicit))
+    assert config.find_env_file() == explicit
+
+
 def test_build_targeting_accepts_string_and_list():
     from_str = core.build_targeting("US,GB", interest_ids="1,2")
     assert from_str["geo_locations"]["countries"] == ["US", "GB"]

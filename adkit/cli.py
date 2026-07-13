@@ -5,6 +5,7 @@ from .commands.adset import adset
 from .commands.automate import automate
 from .commands.campaign import campaign
 from .commands.creative import creative
+from .commands.demo import demo, init
 from .commands.generate import generate
 from .commands.leadform import leadform
 from .commands.targeting import targeting
@@ -22,6 +23,8 @@ def cli():
     """
 
 
+cli.add_command(demo)
+cli.add_command(init)
 cli.add_command(verify)
 cli.add_command(targeting)
 cli.add_command(campaign)

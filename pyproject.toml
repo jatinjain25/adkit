@@ -3,13 +3,16 @@ requires = ["setuptools>=61"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "adkit"
-version = "0.1.1"
+# Distribution name is `meta-adkit` because `adkit` is taken on PyPI by an
+# unrelated project. The import package and the CLI command stay `adkit`
+# (distribution name != import name is normal, cf. beautifulsoup4 -> bs4).
+name = "meta-adkit"
+version = "0.1.2"
 description = "Plug-and-play Meta (Facebook + Instagram) ads automation, drivable from the terminal or Claude Code, with AI creative generation."
 readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "MIT" }
-authors = [{ name = "adkit contributors" }]
+authors = [{ name = "Jatin Jain" }]
 keywords = ["meta", "facebook", "instagram", "ads", "marketing", "automation", "cli", "claude-code", "ai"]
 classifiers = [
     "Development Status :: 4 - Beta",
@@ -55,3 +58,8 @@ ignore = ["E501"]
 
 [tool.setuptools.packages.find]
 include = ["adkit*"]
+
+[tool.setuptools.package-data]
+# Ship the example brief inside the wheel so `adkit demo` / `adkit init` work
+# for pipx and plugin installs that have no repo checkout.
+adkit = ["data/*.yaml"]
