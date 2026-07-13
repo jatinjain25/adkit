@@ -1,18 +1,6 @@
-import json
-
 import click
 
-from .. import config, graph
-
-
-OBJECTIVES = [
-    "OUTCOME_LEADS",
-    "OUTCOME_TRAFFIC",
-    "OUTCOME_ENGAGEMENT",
-    "OUTCOME_AWARENESS",
-    "OUTCOME_SALES",
-    "OUTCOME_APP_PROMOTION",
-]
+from .. import core
 
 
 @click.group()
@@ -29,7 +17,7 @@ def campaign():
 @click.option("--name", required=True, help="Campaign name (shown in Ads Manager).")
 @click.option(
     "--objective",
-    type=click.Choice(OBJECTIVES, case_sensitive=False),
+    type=click.Choice(core.OBJECTIVES, case_sensitive=False),
     default="OUTCOME_LEADS",
     show_default=True,
     help="Campaign objective. Use OUTCOME_LEADS for Instant Form lead gen.",
@@ -60,29 +48,13 @@ def campaign():
 )
 def create(account, name, objective, status, daily_budget, special_ad_category):
     """Create a new campaign in the configured ad account."""
-    ad_account_id = config.ad_account(account)
-
-    data = {
-        "name": name,
-        "objective": objective.upper(),
-        "status": status.upper(),
-        "special_ad_categories": json.dumps(
-            [] if special_ad_category.upper() == "NONE" else [special_ad_category.upper()]
-        ),
-    }
-    if daily_budget is not None:
-        data["daily_budget"] = daily_budget
-    else:
-        # Required by Meta when there's no campaign-level budget. False = each
-        # ad set keeps its own budget (the normal case); True enables 20%
-        # cross-ad-set budget sharing (Advantage Campaign Budget).
-        data["is_adset_budget_sharing_enabled"] = "false"
-
-    click.echo(f"→ Creating campaign in {ad_account_id}...")
-    resp = graph.post(f"{ad_account_id}/campaigns", data=data)
-    cid = resp.get("id")
-    click.echo(f"  ✓ campaign id: {cid}")
-    click.echo(f"    name={name}  objective={objective.upper()}  status={status.upper()}")
+    click.echo("→ Creating campaign...")
+    result = core.create_campaign(
+        name, objective=objective, status=status, daily_budget=daily_budget,
+        special_ad_category=special_ad_category, account=account,
+    )
+    click.echo(f"  ✓ campaign id: {result['id']}")
+    click.echo(f"    name={name}  objective={result['objective']}  status={result['status']}")
     if daily_budget is not None:
         click.echo(f"    daily_budget={daily_budget} (minor units, e.g. cents)")
 
@@ -96,15 +68,7 @@ def create(account, name, objective, status, daily_budget, special_ad_category):
 @click.option("--limit", type=int, default=25, show_default=True)
 def list_campaigns(account, limit):
     """List campaigns in the configured ad account."""
-    ad_account_id = config.ad_account(account)
-    resp = graph.get(
-        f"{ad_account_id}/campaigns",
-        {
-            "fields": "id,name,objective,status,effective_status,daily_budget,lifetime_budget,created_time",
-            "limit": limit,
-        },
-    )
-    rows = resp.get("data", [])
+    rows = core.list_campaigns(account, limit)
     if not rows:
         click.echo("(no campaigns)")
         return

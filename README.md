@@ -25,16 +25,39 @@ It also plugs straight into **Claude Code**, so you can run your ads by talking 
 
 ## Install
 
+Pick whichever fits how you want to use it.
+
+**As a command-line tool** (isolated, recommended):
+
+```bash
+pipx install "adkit[yaml]"          # or: uvx --from "adkit[yaml]" adkit --help
+```
+
+**As a library or to hack on it:**
+
 ```bash
 git clone https://github.com/your-org/adkit
 cd adkit
-pip install -e ".[yaml]"      # yaml extra enables YAML briefs; JSON works without it
-cp .env.example .env          # then fill in your own values (never commit .env)
+pip install -e ".[dev]"             # dev extra = yaml + mcp + pytest + ruff
+```
+
+**As a Claude Code plugin** (adds the slash commands, skill, and MCP server in one step):
+
+```bash
+# in Claude Code
+/plugin marketplace add your-org/adkit
+/plugin install adkit
+```
+
+Then configure your credentials once:
+
+```bash
+cp .env.example .env                # fill in your own values, never commit .env
 ```
 
 You need a Meta app with a token that has ads and pages scopes, an ad account, and a Page linked to an Instagram account. Walkthrough: [docs/setup-token.md](docs/setup-token.md).
 
-For AI creative generation you also need a `GEMINI_API_KEY` and the [gemskills](https://github.com/b-open-io/gemskills) toolkit. That part is optional; the ad automation works without it.
+For AI creative generation you also need a `GEMINI_API_KEY` and the [gemskills](https://github.com/b-open-io/gemskills) toolkit. That part is optional; the ad automation works without it. To run adkit as an MCP server, install the `mcp` extra: `pipx install "adkit[mcp]"`, then point your agent at the `adkit-mcp` command.
 
 ## 60-second tour
 
@@ -94,6 +117,32 @@ adkit ships a `.claude/` folder with a skill and two slash commands, so an agent
 - `/make-creative <description>` writes a prompt, tells you the cost, and generates the asset.
 
 The skill teaches Claude the golden rules: read-only commands are free, creation is PAUSED and safe, and only `ad activate` and `generate` cost money or go live. More in [docs/claude-code.md](docs/claude-code.md).
+
+## Use it as a library
+
+Every operation is a plain function in `adkit.core`, so you can build adkit into your own code:
+
+```python
+from adkit import core
+
+core.verify_credentials()                       # health check
+ids = core.search_targeting("LangChain")         # find interest IDs
+camp = core.create_campaign("My campaign", objective="OUTCOME_TRAFFIC")
+core.launch_from_brief(brief_dict, go=True)      # or build a whole campaign
+```
+
+The CLI and the MCP server are both thin layers over these functions, so there is one implementation of each operation.
+
+## Use it as an MCP server
+
+Any MCP-capable agent can drive adkit:
+
+```bash
+pipx install "adkit[mcp]"
+adkit-mcp            # runs the server over stdio; point your MCP client at this command
+```
+
+It exposes tools like `verify`, `search_targeting`, `create_campaign`, `launch_brief`, and `generate_image`. The tool descriptions carry the same safety notes: creation is PAUSED, and the tools that cost money or go live say so.
 
 ## Commands
 

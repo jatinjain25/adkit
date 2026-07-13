@@ -1,0 +1,16 @@
+{
+  "name": "adkit",
+  "owner": { "name": "adkit contributors" },
+  "metadata": {
+    "description": "adkit: Meta ads automation for Claude Code.",
+    "version": "0.1.0"
+  },
+  "plugins": [
+    {
+      "name": "adkit",
+      "source": "./",
+      "description": "Drive Meta (Facebook + Instagram) ads from Claude Code, with AI creative generation. Ships slash commands, a skill, and an MCP server. Safe by default.",
+      "version": "0.1.0"
+    }
+  ]
+}

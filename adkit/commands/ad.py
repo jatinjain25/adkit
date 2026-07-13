@@ -1,8 +1,6 @@
-import json
-
 import click
 
-from .. import config, graph
+from .. import core
 
 
 @click.group()
@@ -28,29 +26,19 @@ def ad():
 )
 def create(account, name, adset_id, creative_id, status):
     """Create an ad that places a creative into an ad set."""
-    ad_account_id = config.ad_account(account)
-
-    data = {
-        "name": name,
-        "adset_id": adset_id,
-        "creative": json.dumps({"creative_id": creative_id}),
-        "status": status.upper(),
-    }
-
     click.echo(f"→ Creating ad under ad set {adset_id}...")
-    resp = graph.post(f"{ad_account_id}/ads", data=data)
-    aid = resp.get("id")
-    click.echo(f"  ✓ ad id: {aid}")
-    click.echo(f"    name={name}  status={status.upper()}  creative={creative_id}")
-    if status.upper() == "PAUSED":
-        click.echo("    Review it in Ads Manager, then: adkit ad activate --ad-id " + str(aid))
+    result = core.create_ad(name, adset_id, creative_id, status=status, account=account)
+    click.echo(f"  ✓ ad id: {result['id']}")
+    click.echo(f"    name={name}  status={result['status']}  creative={creative_id}")
+    if result["status"] == "PAUSED":
+        click.echo(f"    Review it in Ads Manager, then: adkit ad activate --ad-id {result['id']}")
 
 
 @ad.command("activate")
 @click.option("--ad-id", required=True, help="Ad id to flip ACTIVE (starts spending).")
 def activate(ad_id):
     """Set an ad's status to ACTIVE."""
-    graph.post(ad_id, data={"status": "ACTIVE"})
+    core.set_ad_status(ad_id, "ACTIVE")
     click.echo(f"  ✓ ad {ad_id} is now ACTIVE")
 
 
@@ -58,7 +46,7 @@ def activate(ad_id):
 @click.option("--ad-id", required=True, help="Ad id to pause.")
 def pause(ad_id):
     """Set an ad's status to PAUSED."""
-    graph.post(ad_id, data={"status": "PAUSED"})
+    core.set_ad_status(ad_id, "PAUSED")
     click.echo(f"  ✓ ad {ad_id} is now PAUSED")
 
 
@@ -72,20 +60,9 @@ def pause(ad_id):
 @click.option("--limit", type=int, default=25, show_default=True)
 def list_ads(account, adset_id, limit):
     """List ads in the account (or under one ad set)."""
-    ad_account_id = config.ad_account(account)
-    path = f"{adset_id}/ads" if adset_id else f"{ad_account_id}/ads"
-    resp = graph.get(
-        path,
-        {
-            "fields": "id,name,status,effective_status,adset_id,creative",
-            "limit": limit,
-        },
-    )
-    rows = resp.get("data", [])
+    rows = core.list_ads(account, adset_id, limit)
     if not rows:
         click.echo("(no ads)")
         return
     for a in rows:
-        click.echo(
-            f"{a['id']}  {a.get('effective_status','?'):<14}  {a.get('name','')}"
-        )
+        click.echo(f"{a['id']}  {a.get('effective_status','?'):<14}  {a.get('name','')}")

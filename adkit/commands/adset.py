@@ -3,23 +3,7 @@ from pathlib import Path
 
 import click
 
-from .. import config, graph
-
-
-OPTIMIZATION_GOALS = [
-    "LEAD_GENERATION",
-    "QUALITY_LEAD",
-    "LINK_CLICKS",
-    "REACH",
-    "IMPRESSIONS",
-    "LANDING_PAGE_VIEWS",
-    "OFFSITE_CONVERSIONS",
-    "POST_ENGAGEMENT",
-]
-
-BILLING_EVENTS = ["IMPRESSIONS", "LINK_CLICKS", "THRUPLAY"]
-
-DESTINATION_TYPES = ["ON_AD", "WEBSITE", "MESSENGER", "INSTAGRAM_DIRECT"]
+from .. import core
 
 
 @click.group()
@@ -70,19 +54,19 @@ def adset():
 )
 @click.option(
     "--optimization-goal",
-    type=click.Choice(OPTIMIZATION_GOALS, case_sensitive=False),
+    type=click.Choice(core.OPTIMIZATION_GOALS, case_sensitive=False),
     default="LEAD_GENERATION",
     show_default=True,
 )
 @click.option(
     "--billing-event",
-    type=click.Choice(BILLING_EVENTS, case_sensitive=False),
+    type=click.Choice(core.BILLING_EVENTS, case_sensitive=False),
     default="IMPRESSIONS",
     show_default=True,
 )
 @click.option(
     "--destination-type",
-    type=click.Choice(DESTINATION_TYPES, case_sensitive=False),
+    type=click.Choice(core.DESTINATION_TYPES, case_sensitive=False),
     default="ON_AD",
     show_default=True,
     help="ON_AD = Instant Form (lead capture in-app). WEBSITE sends to your landing page.",
@@ -103,51 +87,24 @@ def adset():
     show_default=True,
 )
 def create(
-    account,
-    page,
-    name,
-    campaign_id,
-    daily_budget,
-    countries,
-    age_min,
-    age_max,
-    interest_ids,
-    targeting_json,
-    optimization_goal,
-    billing_event,
-    destination_type,
-    status,
-    bid_strategy,
+    account, page, name, campaign_id, daily_budget, countries, age_min, age_max,
+    interest_ids, targeting_json, optimization_goal, billing_event, destination_type,
+    status, bid_strategy,
 ):
     """Create a new ad set under a campaign."""
-    ad_account_id = config.ad_account(account)
-    page_id = config.page(page)
-
-    if targeting_json:
-        targeting = json.loads(targeting_json.read_text())
-    else:
-        targeting = _build_targeting(countries, age_min, age_max, interest_ids)
-
-    data = {
-        "name": name,
-        "campaign_id": campaign_id,
-        "daily_budget": daily_budget,
-        "billing_event": billing_event.upper(),
-        "optimization_goal": optimization_goal.upper(),
-        "bid_strategy": bid_strategy.upper(),
-        "destination_type": destination_type.upper(),
-        "status": status.upper(),
-        "targeting": json.dumps(targeting),
-        "promoted_object": json.dumps({"page_id": page_id}),
-    }
-
+    spec = json.loads(targeting_json.read_text()) if targeting_json else None
     click.echo(f"→ Creating ad set under campaign {campaign_id}...")
-    resp = graph.post(f"{ad_account_id}/adsets", data=data)
-    aid = resp.get("id")
-    click.echo(f"  ✓ adset id: {aid}")
+    result = core.create_adset(
+        name, campaign_id, daily_budget, targeting=spec,
+        countries=countries, age_min=age_min, age_max=age_max, interest_ids=interest_ids,
+        optimization_goal=optimization_goal, billing_event=billing_event,
+        destination_type=destination_type, status=status, bid_strategy=bid_strategy,
+        account=account, page=page,
+    )
+    click.echo(f"  ✓ adset id: {result['id']}")
     click.echo(f"    name={name}  goal={optimization_goal.upper()}  status={status.upper()}")
     click.echo(f"    daily_budget={daily_budget} (minor units)")
-    click.echo(f"    targeting: {json.dumps(targeting, indent=2)}")
+    click.echo(f"    targeting: {json.dumps(result['targeting'], indent=2)}")
 
 
 @adset.command("list")
@@ -160,17 +117,7 @@ def create(
 @click.option("--limit", type=int, default=25, show_default=True)
 def list_adsets(account, campaign_id, limit):
     """List ad sets in the account (or under one campaign)."""
-    ad_account_id = config.ad_account(account)
-    path = f"{campaign_id}/adsets" if campaign_id else f"{ad_account_id}/adsets"
-    resp = graph.get(
-        path,
-        {
-            "fields": "id,name,campaign_id,status,effective_status,optimization_goal,"
-            "billing_event,daily_budget,destination_type",
-            "limit": limit,
-        },
-    )
-    rows = resp.get("data", [])
+    rows = core.list_adsets(account, campaign_id, limit)
     if not rows:
         click.echo("(no ad sets)")
         return
@@ -180,22 +127,3 @@ def list_adsets(account, campaign_id, limit):
             f"{a.get('optimization_goal','?'):<18}  budget={a.get('daily_budget','-'):<8}  "
             f"{a.get('name','')}"
         )
-
-
-def _build_targeting(countries: str, age_min: int, age_max: int, interest_ids: str) -> dict:
-    spec = {
-        "geo_locations": {
-            "countries": [c.strip().upper() for c in countries.split(",") if c.strip()],
-        },
-        "age_min": age_min,
-        "age_max": age_max,
-        "publisher_platforms": ["facebook", "instagram"],
-        "facebook_positions": ["feed"],
-        "instagram_positions": ["stream"],
-    }
-    ids = [i.strip() for i in interest_ids.split(",") if i.strip()]
-    if ids:
-        spec["flexible_spec"] = [
-            {"interests": [{"id": i} for i in ids]},
-        ]
-    return spec

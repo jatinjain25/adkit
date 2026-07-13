@@ -1,20 +1,6 @@
-import json
-
 import click
 
-from .. import config, graph
-
-
-def _page_token(page_id: str) -> str:
-    """Lead forms are owned by the Page, so the write must use a Page access token."""
-    resp = graph.get(page_id, {"fields": "access_token"})
-    token = resp.get("access_token")
-    if not token:
-        raise SystemExit(
-            f"Could not get a Page access token for {page_id}. "
-            "Your user token needs pages_manage_ads/leads_retrieval and a role on the Page."
-        )
-    return token
+from .. import core
 
 
 @click.group()
@@ -40,12 +26,7 @@ def leadform():
     show_default=True,
     help="Visible link text for the privacy policy.",
 )
-@click.option(
-    "--locale",
-    default="en_US",
-    show_default=True,
-    help="Form locale, e.g. en_US.",
-)
+@click.option("--locale", default="en_US", show_default=True, help="Form locale, e.g. en_US.")
 @click.option(
     "--headline",
     default="Get in touch",
@@ -58,64 +39,24 @@ def leadform():
     show_default=True,
     help="Intro body text.",
 )
-@click.option(
-    "--thank-you-title",
-    default="Thanks! We'll be in touch shortly.",
-    show_default=True,
-)
+@click.option("--thank-you-title", default="Thanks! We'll be in touch shortly.", show_default=True)
 @click.option(
     "--thank-you-url",
     default=None,
     help="Optional URL for the 'View website' button on the thank-you screen.",
 )
 def create(
-    page,
-    name,
-    privacy_url,
-    privacy_link_text,
-    locale,
-    headline,
-    description,
-    thank_you_title,
-    thank_you_url,
+    page, name, privacy_url, privacy_link_text, locale, headline, description,
+    thank_you_title, thank_you_url,
 ):
-    """Create an Instant Form capturing FULL_NAME + PHONE (auto-prefilled → high CVR)."""
-    page_id = config.page(page)
-    page_token = _page_token(page_id)
-
-    questions = [{"type": "FULL_NAME"}, {"type": "PHONE"}]
-
-    thank_you_page = {
-        "title": thank_you_title,
-        "body": "We received your details.",
-        "button_type": "VIEW_WEBSITE",
-        "button_text": "Visit our site",
-        "website_url": thank_you_url or privacy_url,
-    }
-
-    data = {
-        "name": name,
-        "locale": locale,
-        "questions": json.dumps(questions),
-        "privacy_policy": json.dumps({"url": privacy_url, "link_text": privacy_link_text}),
-        "context_card": json.dumps(
-            {
-                "title": headline,
-                "content": [description],
-                "style": "PARAGRAPH_STYLE",
-            }
-        ),
-        "thank_you_page": json.dumps(thank_you_page),
-        "follow_up_action_url": thank_you_url or privacy_url,
-        # Higher-intent leads; trades volume for quality. Good for warm-call funnels.
-        "is_optimized_for_quality": "true",
-        "access_token": page_token,
-    }
-
-    click.echo(f"→ Creating lead form on Page {page_id}...")
-    resp = graph.post(f"{page_id}/leadgen_forms", data=data)
-    fid = resp.get("id")
-    click.echo(f"  ✓ lead form id: {fid}")
+    """Create an Instant Form capturing FULL_NAME + PHONE (auto-prefilled, high CVR)."""
+    click.echo("→ Creating lead form...")
+    result = core.create_lead_form(
+        name, privacy_url, privacy_link_text=privacy_link_text, locale=locale,
+        headline=headline, description=description, thank_you_title=thank_you_title,
+        thank_you_url=thank_you_url, page=page,
+    )
+    click.echo(f"  ✓ lead form id: {result['id']}")
     click.echo(f"    name={name}  fields=FULL_NAME,PHONE  locale={locale}")
     click.echo("    Use this id as --lead-form-id when creating the creative.")
 
@@ -129,14 +70,7 @@ def create(
 @click.option("--limit", type=int, default=25, show_default=True)
 def list_forms(page, limit):
     """List lead forms on the configured Page."""
-    page_id = config.page(page)
-    page_token = _page_token(page_id)
-    resp = graph.get(
-        f"{page_id}/leadgen_forms",
-        {"fields": "id,name,status,locale,leads_count", "limit": limit},
-        access_token=page_token,
-    )
-    rows = resp.get("data", [])
+    rows = core.list_lead_forms(page, limit)
     if not rows:
         click.echo("(no lead forms)")
         return

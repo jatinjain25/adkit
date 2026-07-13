@@ -1,6 +1,6 @@
 import click
 
-from .. import graph
+from .. import core
 
 
 @click.group()
@@ -13,10 +13,7 @@ def targeting():
 @click.option(
     "--type",
     "type_",
-    type=click.Choice(
-        ["adinterest", "adworkposition", "adworkemployer", "adeducationschool"],
-        case_sensitive=False,
-    ),
+    type=click.Choice(core.TARGETING_TYPES, case_sensitive=False),
     default="adinterest",
     show_default=True,
     help="adinterest = interests; adworkposition = job titles.",
@@ -24,15 +21,10 @@ def targeting():
 @click.option("--limit", type=int, default=15, show_default=True)
 def search(query, type_, limit):
     """Search Meta's targeting taxonomy by name."""
-    resp = graph.get(
-        "search",
-        {"type": type_.lower(), "q": query, "limit": limit},
-    )
-    rows = resp.get("data", [])
+    rows = core.search_targeting(query, type_, limit)
     if not rows:
         click.echo("(no matches)")
         return
     for r in rows:
-        size = r.get("audience_size_lower_bound") or r.get("audience_size") or "-"
-        topic = r.get("topic") or r.get("path", [""])[-1] or ""
-        click.echo(f"{r.get('id'):<22}  ~{size:<14}  {r.get('name','')}  ({topic})")
+        size = r.get("audience_size") or "-"
+        click.echo(f"{str(r.get('id')):<22}  ~{str(size):<14}  {r.get('name','')}  ({r.get('topic','')})")
