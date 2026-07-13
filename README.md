@@ -9,6 +9,12 @@
   <code>verify</code> · <code>targeting</code> · <code>generate</code> · <code>campaign</code> · <code>adset</code> · <code>creative</code> · <code>ad</code> · <code>leadform</code> · <code>automate</code>
 </p>
 
+<p align="center">
+  <a href="https://github.com/jatinjain25/adkit/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/jatinjain25/adkit/actions/workflows/ci.yml/badge.svg"></a>
+  <img alt="Python" src="https://img.shields.io/badge/python-3.10%2B-blue">
+  <img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-green">
+</p>
+
 ---
 
 Launching Meta ads through the Marketing API is fiddly: tokens and scopes, the Page to Instagram link, targeting IDs, creative uploads, the campaign to ad-set to creative to ad chain, and the ever-present risk of accidentally spending money. adkit turns that into a handful of clean commands, plus one command that builds a whole campaign from a single brief file. It is safe by default: every object is created **PAUSED**, and the end-to-end automation is **dry-run** until you explicitly say go.
