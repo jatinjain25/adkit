@@ -1,0 +1,52 @@
+# adkit campaign brief (example)
+#
+# Run a dry run first (prints the plan, writes nothing, spends nothing):
+#   adkit automate launch --brief examples/briefs/example.yaml
+# Then build it for real (all objects created PAUSED):
+#   adkit automate launch --brief examples/briefs/example.yaml --go
+#
+# account / page / ig_actor are optional. If omitted, adkit uses the values in
+# your .env (META_AD_ACCOUNT_ID, META_PAGE_ID, META_INSTAGRAM_ACTOR_ID).
+
+account: null
+page: null
+creatives_dir: creatives
+
+campaign:
+  name: "Example | TOF | Traffic"
+  objective: OUTCOME_TRAFFIC        # OUTCOME_TRAFFIC or OUTCOME_LEADS
+  daily_budget: 5000                # optional campaign budget (CBO), minor units (5000 = $50.00)
+
+adsets:
+  - name: "Agent builders"
+    daily_budget: 2500              # minor units, only used if campaign has no daily_budget
+    countries: [US, GB, CA]
+    age_min: 22
+    age_max: 45
+    interest_ids: []                # find IDs with: adkit targeting search "LangChain"
+    optimization_goal: LINK_CLICKS
+    destination_type: WEBSITE
+    ads:
+      - name: "Expensive chatbot"
+        message: >-
+          Your agent forgets every user the second the session ends. Add memory
+          in one API call instead of building it for six weeks.
+        headline: "Give your product a memory"
+        link: "https://example.com"
+        cta: LEARN_MORE
+        # Provide a ready image:
+        image: "creatives/expensive_chatbot.png"
+        # ...or have adkit generate it first (only runs when you pass --go):
+        # generate:
+        #   type: image
+        #   prompt: "Dark developer-brand ad, bold headline 'Give your AI a memory'"
+        #   aspect: "1:1"
+
+      - name: "Buy vs build"
+        message: >-
+          Build your own retrieval stack: 6 to 8 weeks. Or ship today with one
+          API. Model agnostic, no lock in.
+        headline: "Don't build a memory team"
+        link: "https://example.com"
+        cta: SIGN_UP
+        image: "creatives/buy_vs_build.png"

@@ -1,0 +1,15 @@
+{
+  "geo_locations": { "countries": ["US", "GB", "CA", "DE", "IN"] },
+  "age_min": 22,
+  "age_max": 45,
+  "publisher_platforms": ["facebook", "instagram"],
+  "facebook_positions": ["feed"],
+  "instagram_positions": ["stream"],
+  "flexible_spec": [
+    {
+      "interests": [
+        { "id": "6003127967124", "name": "Software development (example id, replace via `adkit targeting search`)" }
+      ]
+    }
+  ]
+}

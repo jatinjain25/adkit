@@ -1,0 +1,31 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "adkit"
+version = "0.1.0"
+description = "Plug-and-play Meta (Facebook + Instagram) ads automation, drivable from the terminal or Claude Code, with AI creative generation."
+readme = "README.md"
+requires-python = ">=3.9"
+license = { text = "MIT" }
+authors = [{ name = "adkit contributors" }]
+keywords = ["meta", "facebook", "instagram", "ads", "marketing", "automation", "cli", "claude-code", "ai"]
+dependencies = [
+    "requests>=2.31",
+    "click>=8.1",
+]
+
+[project.optional-dependencies]
+# YAML briefs for `adkit automate launch`. JSON briefs work without this.
+yaml = ["pyyaml>=6.0"]
+
+[project.urls]
+Homepage = "https://github.com/your-org/adkit"
+Issues = "https://github.com/your-org/adkit/issues"
+
+[project.scripts]
+adkit = "adkit.cli:cli"
+
+[tool.setuptools.packages.find]
+include = ["adkit*"]

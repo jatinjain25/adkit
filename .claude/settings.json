@@ -1,0 +1,21 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(adkit verify)",
+      "Bash(adkit verify:*)",
+      "Bash(adkit targeting search:*)",
+      "Bash(adkit campaign list:*)",
+      "Bash(adkit adset list:*)",
+      "Bash(adkit ad list:*)",
+      "Bash(adkit creative list:*)",
+      "Bash(adkit leadform list:*)",
+      "Bash(adkit generate spend)"
+    ],
+    "ask": [
+      "Bash(adkit ad activate:*)",
+      "Bash(adkit generate image:*)",
+      "Bash(adkit generate video:*)",
+      "Bash(adkit automate launch:*)"
+    ]
+  }
+}
