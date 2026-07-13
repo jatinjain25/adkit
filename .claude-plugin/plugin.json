@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "description": "Plug-and-play Meta (Facebook + Instagram) ads automation for Claude Code: verify credentials, research targeting, generate AI creative, and launch whole campaigns from a brief. Safe by default (everything PAUSED, dry-run until you confirm).",
   "author": { "name": "adkit contributors" },
-  "homepage": "https://github.com/your-org/adkit",
+  "homepage": "https://github.com/jatinjain25/adkit",
   "license": "MIT",
   "keywords": ["meta", "facebook", "instagram", "ads", "marketing", "automation"],
   "commands": "./.claude/commands",

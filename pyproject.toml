@@ -35,8 +35,8 @@ mcp = ["mcp>=1.2"]
 dev = ["pyyaml>=6.0", "mcp>=1.2", "pytest>=7.0", "ruff>=0.4"]
 
 [project.urls]
-Homepage = "https://github.com/your-org/adkit"
-Issues = "https://github.com/your-org/adkit/issues"
+Homepage = "https://github.com/jatinjain25/adkit"
+Issues = "https://github.com/jatinjain25/adkit/issues"
 
 [project.scripts]
 adkit = "adkit.cli:cli"

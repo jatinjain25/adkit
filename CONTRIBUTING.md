@@ -5,7 +5,7 @@ Thanks for helping make Meta ads automation less painful.
 ## Setup
 
 ```bash
-git clone https://github.com/your-org/adkit
+git clone https://github.com/jatinjain25/adkit
 cd adkit
 python -m venv .venv && source .venv/bin/activate
 pip install -e ".[yaml]"

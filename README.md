@@ -36,7 +36,7 @@ pipx install "adkit[yaml]"          # or: uvx --from "adkit[yaml]" adkit --help
 **As a library or to hack on it:**
 
 ```bash
-git clone https://github.com/your-org/adkit
+git clone https://github.com/jatinjain25/adkit
 cd adkit
 pip install -e ".[dev]"             # dev extra = yaml + mcp + pytest + ruff
 ```
@@ -45,7 +45,7 @@ pip install -e ".[dev]"             # dev extra = yaml + mcp + pytest + ruff
 
 ```bash
 # in Claude Code
-/plugin marketplace add your-org/adkit
+/plugin marketplace add jatinjain25/adkit
 /plugin install adkit
 ```
 
