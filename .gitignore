@@ -7,6 +7,9 @@
 credentials.json
 token*.json
 
+# Your real campaign briefs (may reference real accounts). Examples stay tracked.
+/briefs/
+
 # Generated creative and its spend log
 creatives/
 *.mp4

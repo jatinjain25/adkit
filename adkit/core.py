@@ -223,6 +223,7 @@ def build_targeting(
     age_min: int = 25,
     age_max: int = 55,
     interest_ids: str | Iterable[str] = "",
+    advantage_audience: int = 0,
 ) -> dict:
     if isinstance(countries, str):
         country_list = [c.strip().upper() for c in countries.split(",") if c.strip()]
@@ -235,6 +236,10 @@ def build_targeting(
         "publisher_platforms": ["facebook", "instagram"],
         "facebook_positions": ["feed"],
         "instagram_positions": ["stream"],
+        # Meta requires this flag on every ad set. 0 = use exactly the audience you
+        # defined; 1 = let Advantage expand it. We default to 0 so targeting is
+        # honored as written; pass advantage_audience=1 to opt into expansion.
+        "targeting_automation": {"advantage_audience": advantage_audience},
     }
     if isinstance(interest_ids, str):
         ids = [i.strip() for i in interest_ids.split(",") if i.strip()]
@@ -260,12 +265,18 @@ def create_adset(
     destination_type: str = "ON_AD",
     status: str = "PAUSED",
     bid_strategy: str = "LOWEST_COST_WITHOUT_CAP",
+    advantage_audience: int = 0,
     account: str | None = None,
     page: str | None = None,
 ) -> dict:
     ad_account_id = config.ad_account(account)
     page_id = config.page(page)
-    spec = targeting if targeting is not None else build_targeting(countries, age_min, age_max, interest_ids)
+    if targeting is not None:
+        spec = dict(targeting)
+        # Meta requires the flag even on a hand-supplied targeting spec.
+        spec.setdefault("targeting_automation", {"advantage_audience": advantage_audience})
+    else:
+        spec = build_targeting(countries, age_min, age_max, interest_ids, advantage_audience)
     data = {
         "name": name,
         "campaign_id": campaign_id,
@@ -358,7 +369,9 @@ def create_creative(
         object_story_spec = {"page_id": page_id, "link_data": link_data}
 
     if ig_actor_id:
-        object_story_spec["instagram_actor_id"] = ig_actor_id
+        # instagram_actor_id is deprecated; current Graph API expects
+        # instagram_user_id for the connected Instagram account.
+        object_story_spec["instagram_user_id"] = ig_actor_id
 
     resp = graph.post(
         f"{ad_account_id}/adcreatives",
@@ -762,6 +775,7 @@ def launch_from_brief(
                     billing_event=aset.get("billing_event", "IMPRESSIONS"),
                     destination_type=aset.get("destination_type", "ON_AD" if is_leadgen else "WEBSITE"),
                     bid_strategy=aset.get("bid_strategy", "LOWEST_COST_WITHOUT_CAP"),
+                    advantage_audience=aset.get("advantage_audience", 0),
                     account=account, page=page,
                 )
                 emit(f"adset {adset['id']} ({aset['name']})")
