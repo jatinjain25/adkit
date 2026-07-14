@@ -7,7 +7,7 @@ build-backend = "setuptools.build_meta"
 # unrelated project. The import package and the CLI command stay `adkit`
 # (distribution name != import name is normal, cf. beautifulsoup4 -> bs4).
 name = "meta-adkit"
-version = "0.1.2"
+version = "0.1.3"
 description = "Plug-and-play Meta (Facebook + Instagram) ads automation, drivable from the terminal or Claude Code, with AI creative generation."
 readme = "README.md"
 requires-python = ">=3.10"

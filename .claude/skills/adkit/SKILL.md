@@ -40,6 +40,12 @@ fix that before anything else (see docs/setup-token.md).
 - Go live: `adkit ad activate --ad-id <id>` (only after the user confirms). This
   flips the whole delivery chain (campaign + ad set + ad) ACTIVE so the ad
   actually serves; other ads in the set stay PAUSED. `adkit ad pause` stops it.
+- Optimize live ads: `adkit optimize report [--target-cpl N] [--lead-form-id ID]
+  [--revenue AD_ID=AMT] [--target-roas N]` is read-only and free; it recommends
+  KILL/SCALE/KEEP per ad and never judges an ad still in the learning window.
+  Enact a call with `adkit optimize apply --ad-id <id> --action pause|scale --yes`
+  (only after the user confirms; `--action scale` raises budget, i.e. spends more).
+  Never surface raw lead PII; the report only carries redacted aggregates.
 - Re-running `automate launch --go` after a failure is safe: adkit reuses any
   campaign/ad set/ad that already exists by name and won't regenerate creative
   whose file is already on disk, so nothing is duplicated or double-charged.

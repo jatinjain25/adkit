@@ -39,6 +39,9 @@ def verify(account, page):
     if r["missing_scopes"]:
         click.echo(f"  ! missing scopes: {', '.join(r['missing_scopes'])}")
         click.echo(f"    Fix: regenerate the token with these scopes ({DOCS}#2-get-a-token-with-the-right-scopes).")
+    if r.get("missing_recommended_scopes"):
+        click.echo(f"  ~ optional scopes (for `adkit optimize` lead quality): "
+                   f"{', '.join(r['missing_recommended_scopes'])}")
     if not r["token_valid"]:
         raise SystemExit(f"Token is not valid. Regenerate it ({DOCS}#2-get-a-token-with-the-right-scopes).")
 

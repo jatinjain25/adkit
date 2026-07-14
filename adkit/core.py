@@ -82,6 +82,9 @@ REQUIRED_SCOPES = [
     "pages_manage_posts", "pages_manage_metadata",
     "instagram_basic", "instagram_content_publish",
 ]
+# Not required for launching ads, but needed for `adkit optimize` to pull lead
+# data and score quality on lead-gen campaigns. Reported as a soft hint.
+RECOMMENDED_SCOPES = ["leads_retrieval"]
 
 
 def verify_credentials(account: str | None = None, page: str | None = None) -> dict:
@@ -100,6 +103,7 @@ def verify_credentials(account: str | None = None, page: str | None = None) -> d
         "expires_at": dbg.get("expires_at"),
         "scopes": scopes,
         "missing_scopes": [s for s in REQUIRED_SCOPES if s not in scopes],
+        "missing_recommended_scopes": [s for s in RECOMMENDED_SCOPES if s not in scopes],
     }
 
     page_id = config.page(page)
@@ -399,6 +403,39 @@ def set_campaign_status(campaign_id: str, status: str) -> dict:
     return {"id": campaign_id, "status": status.upper()}
 
 
+def set_adset_budget(adset_id: str, daily_budget: int) -> dict:
+    """Set an ad set's daily budget (account-currency MINOR units, e.g. cents).
+
+    This is the one spending-relevant primitive the optimizer uses: raising the
+    budget on a winning ad set increases spend, so callers must gate it behind an
+    explicit confirmation (the CLI requires --yes; the MCP tool requires
+    ADKIT_ALLOW_SPEND).
+    """
+    graph.post(adset_id, data={"daily_budget": int(daily_budget)})
+    return {"id": adset_id, "daily_budget": int(daily_budget)}
+
+
+def scale_ad_budget(ad_id: str, pct: float) -> dict:
+    """Raise the daily budget of an ad's parent ad set by `pct` percent.
+
+    Spend-affecting: gate it behind explicit confirmation. Raises if the ad set
+    has no ad-set-level budget (i.e. the campaign uses a campaign budget/CBO), in
+    which case the campaign budget is what you'd scale instead.
+    """
+    adset_id = graph.get(ad_id, {"fields": "adset_id"}).get("adset_id")
+    if not adset_id:
+        raise ValueError(f"Could not resolve the parent ad set for ad {ad_id}.")
+    old = int((graph.get(adset_id, {"fields": "daily_budget"}).get("daily_budget")) or 0)
+    if not old:
+        raise ValueError(
+            f"Ad set {adset_id} has no ad-set daily budget to scale "
+            "(the campaign likely uses a campaign budget/CBO; scale that instead)."
+        )
+    new = int(round(old * (1 + pct / 100.0)))
+    set_adset_budget(adset_id, new)
+    return {"adset_id": adset_id, "old_daily_budget": old, "new_daily_budget": new, "pct": pct}
+
+
 def activate_delivery(ad_id: str) -> dict:
     """Actually make an ad deliver.
 
@@ -487,6 +524,82 @@ def list_lead_forms(page: str | None = None, limit: int = 25) -> list[dict]:
         access_token=token,
     )
     return resp.get("data", [])
+
+
+# --------------------------------------------------------------------------- #
+# Insights & leads (read-only; feed the optimizer)
+# --------------------------------------------------------------------------- #
+INSIGHTS_FIELDS = (
+    "spend,impressions,clicks,ctr,cpc,cpm,reach,actions,"
+    "cost_per_action_type,date_start,date_stop"
+)
+
+
+def get_insights(node_id: str, *, date_preset: str = "last_3d") -> dict:
+    """Performance for one node (ad, ad set, or campaign) over a recent window.
+
+    Returns the single insights row (or {} if the node has no delivery yet).
+    date_preset is a Meta preset like last_3d, last_7d, today, maximum.
+    Read-only.
+    """
+    resp = graph.get(node_id, {"fields": f"insights.date_preset({date_preset}){{{INSIGHTS_FIELDS}}}"})
+    data = (resp.get("insights") or {}).get("data") or []
+    return data[0] if data else {}
+
+
+def get_ads_with_insights(
+    account: str | None = None,
+    campaign_id: str | None = None,
+    *,
+    date_preset: str = "last_3d",
+    limit: int = 50,
+) -> list[dict]:
+    """Every ad (optionally under one campaign) paired with its recent insights.
+
+    Returns [{"ad": <ad row>, "insights": <insights row or {}>}]. The ad row
+    carries daily_budget from its ad set so the optimizer can size the learning
+    window and budget bumps.
+    """
+    ad_account_id = config.ad_account(account)
+    path = f"{campaign_id}/ads" if campaign_id else f"{ad_account_id}/ads"
+    resp = graph.get(
+        path,
+        {
+            "fields": "id,name,status,effective_status,adset_id,campaign_id,"
+            "adset{daily_budget,optimization_goal,destination_type},"
+            f"insights.date_preset({date_preset}){{{INSIGHTS_FIELDS}}}",
+            "limit": limit,
+        },
+    )
+    rows = []
+    for ad in resp.get("data", []):
+        ins = (ad.pop("insights", None) or {}).get("data") or []
+        rows.append({"ad": ad, "insights": ins[0] if ins else {}})
+    return rows
+
+
+def get_leads(lead_form_id: str, *, limit: int = 200, page: str | None = None) -> list[dict]:
+    """Fetch submitted leads for an Instant Form. Read-only, Page-token aware.
+
+    Returns each lead as {"id", "created_time", "fields": {name: value}}. This
+    returns real PII: callers must never persist it and must redact it in output.
+    Requires the leads_retrieval permission on the token.
+    """
+    page_id = config.page(page)
+    token = page_access_token(page_id)
+    resp = graph.get(
+        f"{lead_form_id}/leads",
+        {"fields": "id,created_time,field_data", "limit": limit},
+        access_token=token,
+    )
+    leads = []
+    for row in resp.get("data", []):
+        fields = {}
+        for fd in row.get("field_data", []):
+            values = fd.get("values") or []
+            fields[fd.get("name", "")] = values[0] if values else ""
+        leads.append({"id": row.get("id"), "created_time": row.get("created_time"), "fields": fields})
+    return leads
 
 
 # --------------------------------------------------------------------------- #

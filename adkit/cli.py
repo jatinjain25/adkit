@@ -8,6 +8,7 @@ from .commands.creative import creative
 from .commands.demo import demo, init
 from .commands.generate import generate
 from .commands.leadform import leadform
+from .commands.optimize import optimize
 from .commands.targeting import targeting
 from .commands.verify import verify
 
@@ -34,6 +35,7 @@ cli.add_command(creative)
 cli.add_command(ad)
 cli.add_command(generate)
 cli.add_command(automate)
+cli.add_command(optimize)
 
 
 if __name__ == "__main__":

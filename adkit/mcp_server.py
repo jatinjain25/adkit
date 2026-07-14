@@ -198,6 +198,38 @@ def pause_ad(ad_id: str) -> dict:
     return core.set_ad_status(ad_id, "PAUSED")
 
 
+@mcp.tool()
+def optimize_report(
+    campaign_id: str | None = None,
+    window: str = "last_3d",
+    target_cpl: float | None = None,
+    target_roas: float = 1.0,
+    revenue: dict[str, float] | None = None,
+    lead_form_id: str | None = None,
+) -> dict:
+    """Analyze live ads and recommend KILL / SCALE / KEEP for each. Read-only:
+    it changes nothing. Judges lead-gen ads on cost per qualified lead vs
+    target_cpl (dollars) and marketing ads on ROAS from the revenue map (ad_id ->
+    dollars) vs target_roas. If lead_form_id is given, its leads are pulled and
+    quality-scored. Lead PII is never returned, only aggregate quality counts and
+    redacted samples. Ads still in the learning window return WAIT/WATCH."""
+    from .optimize import EvaluationPolicy, evaluate_account
+    policy = EvaluationPolicy(target_cpl=target_cpl, target_roas=target_roas)
+    return evaluate_account(
+        campaign_id=campaign_id, date_preset=window, policy=policy,
+        revenue=revenue or {}, lead_form_id=lead_form_id,
+    )
+
+
+@mcp.tool()
+def scale_ad_budget(ad_id: str, pct: float = 25) -> dict:
+    """Raise the daily budget of an ad's parent ad set by `pct` percent. THIS
+    INCREASES SPEND and is gated by ADKIT_ALLOW_SPEND. Use on a SCALE verdict
+    from optimize_report."""
+    _require_spend_opt_in("scale_ad_budget")
+    return core.scale_ad_budget(ad_id, pct)
+
+
 def main() -> None:
     """Console entry point: run the MCP server over stdio."""
     mcp.run()

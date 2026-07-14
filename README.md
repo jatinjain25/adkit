@@ -146,6 +146,36 @@ adsets:
 
 Full example with comments: [examples/briefs/example.yaml](examples/briefs/example.yaml).
 
+## Optimize live ads (kill losers, scale winners)
+
+Once ads are delivering, `adkit optimize report` pulls each ad's performance and tells you, in plain language, what to do — without touching anything:
+
+```bash
+# Lead-gen: judge on cost per QUALIFIED lead (pulls the form's leads and scores quality)
+adkit optimize report --target-cpl 3.00 --lead-form-id <form_id>
+
+# Marketing: judge on ROAS from revenue you supply
+adkit optimize report --revenue <ad_id>=480 --target-roas 2.0
+```
+
+Each ad comes back as **KILL** (over target, draining budget), **SCALE** (a winner worth more budget), **KEEP**, or **WAIT** — and it will never judge an ad still in Meta's learning phase (the 2-3 day / budget window is a policy default). The report prints the exact command to enact each call. Nothing changes until you run it:
+
+```bash
+adkit optimize apply --ad-id <id> --action pause --yes    # stop a loser
+adkit optimize apply --ad-id <id> --action scale --yes    # raise the winner's ad set budget
+```
+
+**Build your own logic.** The decision engine is a pure, importable function with an overridable policy — swap the thresholds or the whole function; the CLI and the agent use whatever you set:
+
+```python
+from adkit.optimize import EvaluationPolicy, evaluate_account
+
+policy = EvaluationPolicy(target_cpl=3.00, min_days_before_judging=3, scale_budget_pct=30)
+report = evaluate_account(policy=policy, lead_form_id="<form_id>")
+```
+
+Lead quality is scored locally (implausible phone, disposable/invalid email, duplicates) and **lead PII is never written to disk, never printed unredacted, and never returned over MCP** — only aggregate counts. Pulling leads needs the `leads_retrieval` scope; `adkit verify` flags it if missing.
+
 ## Drive it from Claude Code
 
 adkit ships a `.claude/` folder with a skill and two slash commands, so an agent can operate your account with the same guardrails:
@@ -213,6 +243,8 @@ It exposes tools like `verify`, `search_targeting`, `create_campaign`, `launch_b
 | `adkit ad create \| activate \| pause \| list` | Build ads; `activate` takes the whole ad→set→campaign chain live. |
 | `adkit leadform create \| list` | Create Instant Forms for lead-gen. |
 | `adkit automate launch` | Build a whole campaign from a brief (dry run unless `--go`). |
+| `adkit optimize report` | Analyze live ads; recommend KILL/SCALE/KEEP. Read-only. |
+| `adkit optimize apply` | Enact one recommendation (pause a loser / scale a winner). |
 
 ## Safety model
 
