@@ -4,6 +4,16 @@ All notable changes to adkit are recorded here. The format follows
 [Keep a Changelog](https://keepachangelog.com/), and adkit uses semantic
 versioning.
 
+## [Unreleased]
+
+### Added
+- `adkit research`: competitive research via Meta's official Ad Library API. Pulls
+  competitor ads for a keyword + country, ranks advertisers by longevity x variant
+  count (the honest proxy, since Meta hides spend for commercial ads), and
+  summarizes winning hooks, offers, CTAs, and placements. This is the front of the
+  flow (Research → Brief → Creative → Build → Launch → Optimize). Uses the
+  sanctioned API, never scraping.
+
 ## [0.1.1]
 
 Security and reliability hardening.

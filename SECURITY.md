@@ -59,6 +59,13 @@ the **files on your machine**.
   `./creatives`) and reject anything that escapes it. This blocks an agent from
   writing arbitrary files or reading and uploading `/etc/passwd`.
 
+## Competitive research uses the sanctioned API
+
+`adkit research` reads competitor ads through Meta's official Ad Library API
+(`ads_archive`), never by scraping the Ad Library website. Scraping Meta
+violates their Terms and can get your ad account banned; the API returns the
+same ad content and requires a one-time identity confirmation.
+
 ## Supply chain and trust boundaries
 
 - **Runtime dependencies** are `requests` and `click` (plus optional `pyyaml`

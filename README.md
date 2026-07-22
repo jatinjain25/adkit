@@ -21,6 +21,16 @@ Launching Meta ads through the Marketing API is fiddly: tokens and scopes, the P
 
 It also plugs straight into **Claude Code**, so you can run your ads by talking to an agent, with cost and safety guardrails built in.
 
+## The adkit flow
+
+adkit is the whole journey of automating an ad, one command per step:
+
+**Research** competitors → write a **Brief** → generate **Creative** → **Build** the campaign → **Launch** it → **Optimize** what runs.
+
+```
+research  →  init / brief  →  generate  →  automate  →  ad activate  →  optimize
+```
+
 ## Try it in 30 seconds (no account needed)
 
 ```bash
@@ -118,6 +128,18 @@ adkit automate launch --brief examples/briefs/example.yaml --go
 #    ad set and campaign to ACTIVE (all three must be active to deliver):
 adkit ad activate --ad-id <id>
 ```
+
+## Research competitors first
+
+Before you build anything, see what already works in your market:
+
+```bash
+adkit research --keyword "edtech" --country IN
+```
+
+adkit pulls matching ads from Meta's **official Ad Library API** (not scraping, which violates Meta's Terms), then ranks advertisers by **how long and how widely they run** their ads. Meta does not expose impressions or spend for commercial ads, so longevity and variant count are the honest proxy: advertisers kill losers fast, so a long-running, heavily-varied ad is almost certainly a winner. You get the winning advertisers, their longest-running ads (with snapshot links to view), and the common hooks, offers, CTAs, and placements, so you can design your ad from what's proven.
+
+First use requires a one-time identity confirmation and terms acceptance at [facebook.com/ads/library/api](https://www.facebook.com/ads/library/api); adkit tells you if it's not set up yet. API coverage of non-EU commercial ads can be sparse; the public Ad Library website is the manual fallback.
 
 ## The brief
 
@@ -234,6 +256,7 @@ It exposes tools like `verify`, `search_targeting`, `create_campaign`, `launch_b
 | --- | --- |
 | `adkit demo` | Dry-run the whole flow with no account or keys. Start here. |
 | `adkit init [brief.yaml]` | Write a starter campaign brief you can edit. |
+| `adkit research` | Research competitor ads in the Ad Library; rank winners by longevity. |
 | `adkit verify` | Check token validity, scopes, Page to Instagram link, ad account. |
 | `adkit targeting search` | Look up interest and job-title IDs from Meta's taxonomy. |
 | `adkit generate image \| video \| spend` | Generate AI creative and see spend. |
