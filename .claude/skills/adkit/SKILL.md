@@ -32,6 +32,7 @@ fix that before anything else (see docs/setup-token.md).
 
 ## Command map
 
+- Research competitors FIRST: `adkit research --keyword "<category>" --country <cc>` reads the Ad Library and ranks the winning ads/advertisers (by longevity x variants) plus their hooks, offers, CTAs, and placements. Add `--seed-brief brief.yaml` to turn the findings into a starter brief. Read-only. Base your creative angle and copy on what this returns.
 - Research targeting: `adkit targeting search "LangChain"` (add `--type adworkposition` for job titles). Returns interest IDs to use in ad sets.
 - Generate creative: `adkit generate image "PROMPT" --out creatives/x.png --aspect 1:1` and `adkit generate video "PROMPT" --out creatives/x.mp4 --duration 8`. Check spend with `adkit generate spend`.
 - Build by hand: `adkit campaign create` then `adkit adset create --campaign-id <id>` then `adkit creative create` then `adkit ad create --adset-id <id> --creative-id <id>`.
@@ -53,12 +54,19 @@ fix that before anything else (see docs/setup-token.md).
 ## Typical flow you should follow
 
 1. `adkit verify`
-2. `adkit targeting search "<interest>"` to pick interest IDs.
-3. Draft a brief YAML (campaign, ad sets with targeting, ads with copy).
-4. `adkit automate launch --brief brief.yaml` (dry run) and show the plan.
-5. On the user's "go": `adkit automate launch --brief brief.yaml --go`.
-6. Report the created IDs. Remind the user everything is PAUSED, and that
+2. **`adkit research --keyword "<category>" --country <cc>`** to see what's already
+   working, and base the creative angle/copy/CTA on it. Skip only if the user
+   explicitly says so, and tell them you skipped it.
+3. `adkit targeting search "<interest>"` to pick interest IDs.
+4. Draft a brief YAML (or `adkit research ... --seed-brief brief.yaml` to seed one),
+   with ads whose copy is informed by the research.
+5. `adkit automate launch --brief brief.yaml` (dry run) and show the plan.
+6. On the user's "go": `adkit automate launch --brief brief.yaml --go`.
+7. Report the created IDs. Remind the user everything is PAUSED, and that
    `adkit ad activate --ad-id <id>` takes the whole chain live when they're ready.
+
+Before generating any creative (`adkit generate` or a brief `generate:` block),
+prefer to have run research first so the angle reflects proven winners.
 
 Minor budget units matter: budgets are in the account currency's minor units
 (cents on USD), so 5000 = $50.00.

@@ -74,10 +74,12 @@ def demo() -> None:
             click.echo(f"    ad: {ad['name']}  [{ad['media']}]  cta={ad['cta']}{tag}")
     click.echo(
         "\nNothing was created. When you're ready to run this on a real account:\n"
-        "  1. adkit init my-brief.yaml     # write this brief to disk to edit\n"
-        "  2. adkit verify                 # connect your Meta account (adkit guides you)\n"
+        "  1. adkit verify                 # connect your Meta account (adkit guides you)\n"
+        "  2. adkit research --keyword \"<your category>\" --country <cc> --seed-brief my-brief.yaml\n"
+        "                                  # see what's working, seed a brief from it\n"
         "  3. adkit automate launch --brief my-brief.yaml        # dry run again\n"
-        "  4. adkit automate launch --brief my-brief.yaml --go   # build it, all PAUSED"
+        "  4. adkit automate launch --brief my-brief.yaml --go   # build it, all PAUSED\n"
+        "  (no research access yet? use `adkit init my-brief.yaml` for a blank starter brief.)"
     )
 
 
@@ -89,4 +91,8 @@ def init(out: Path) -> None:
         raise SystemExit(f"{out} already exists; choose another path or delete it first.")
     out.write_text(_bundled_brief_text())
     click.echo(f"  ✓ wrote starter brief: {out}")
+    click.echo(
+        "Tip: seed a brief from what's already working instead: "
+        "adkit research --keyword \"<category>\" --country <cc> --seed-brief " + str(out)
+    )
     click.echo("Edit it, then: adkit automate launch --brief " + str(out) + " (add --go to build).")

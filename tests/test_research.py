@@ -64,6 +64,40 @@ def test_search_maps_permission_error(monkeypatch):
     assert "library/api" in str(ei.value)
 
 
+def test_build_seed_brief_is_valid_and_seeded():
+    from adkit import core
+    report = research.analyze([dict(a) for a in SAMPLE], now=NOW)
+    text = research.build_seed_brief(report, "edtech", "in")
+    import yaml  # available via the yaml/dev extra used in CI
+    spec = yaml.safe_load(text)
+    # It must parse and be a valid brief adkit can plan.
+    plan = core.plan_brief(spec)
+    assert plan["adsets"][0]["ads"][0]["will_generate"] is True  # has a generate: block
+    assert spec["adsets"][0]["countries"] == ["IN"]
+    # The dominant competitor CTA ("Book a free demo") maps to a Meta CTA enum.
+    assert spec["adsets"][0]["ads"][0]["cta"] in {"BOOK_TRAVEL", "LEARN_MORE"}
+    # It links competitors to study, not their verbatim copy.
+    assert "ads/library" in text
+
+
+def test_research_marker_and_reminder(monkeypatch, tmp_path):
+    monkeypatch.setenv("XDG_CACHE_HOME", str(tmp_path))
+    monkeypatch.delenv("ADKIT_NO_TIPS", raising=False)
+    # No research yet -> reminder shows.
+    assert research.recent_research() is None
+    assert research.research_reminder() is not None
+    # After recording -> reminder is silent.
+    research.record_research("edtech", "IN")
+    assert research.recent_research()["keyword"] == "edtech"
+    assert research.research_reminder() is None
+
+
+def test_reminder_silenced_by_env(monkeypatch, tmp_path):
+    monkeypatch.setenv("XDG_CACHE_HOME", str(tmp_path))  # fresh: no marker
+    monkeypatch.setenv("ADKIT_NO_TIPS", "1")
+    assert research.research_reminder() is None
+
+
 def test_search_paginates_then_stops(monkeypatch):
     pages = [
         {"data": SAMPLE[:2], "paging": {"cursors": {"after": "CUR"}}},

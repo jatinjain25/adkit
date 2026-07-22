@@ -25,8 +25,11 @@ setup guidance.
 from __future__ import annotations
 
 import json
+import os
+import re
 from collections import Counter
 from datetime import datetime, timezone
+from pathlib import Path
 from statistics import median
 from urllib.parse import urlparse
 
@@ -244,3 +247,166 @@ def research(
         keyword, country, active_status=active_status, media_type=media_type, limit=limit
     )
     return analyze(ads)
+
+
+# --------------------------------------------------------------------------- #
+# Seed brief: turn research into a starter campaign brief (research -> brief ->
+# creative). We encode the winning *patterns* and link to competitor ads to
+# study, never their verbatim copy.
+# --------------------------------------------------------------------------- #
+_CTA_MAP = [
+    ("sign up", "SIGN_UP"), ("apply", "APPLY_NOW"), ("subscribe", "SUBSCRIBE"),
+    ("quote", "GET_QUOTE"), ("book", "BOOK_TRAVEL"),
+]
+_STOP = set(
+    "the a an and or to for of in on with your you our we is are it this that get how why what "
+    "best top new free now your yours their they them from at by as be will can more most just "
+    "about into over out up down off all any one two your".split()
+)
+
+
+def _meta_cta(text: str | None) -> str:
+    t = (text or "").lower()
+    for needle, cta in _CTA_MAP:
+        if needle in t:
+            return cta
+    return "LEARN_MORE"
+
+
+def _themes(report: dict, n: int = 6) -> list[str]:
+    counts: Counter = Counter()
+    for ad in report.get("top_ads", []):
+        for word in re.findall(r"[a-zA-Z]{4,}", (ad.get("body") or "").lower()):
+            if word not in _STOP:
+                counts[word] += 1
+    return [w for w, _ in counts.most_common(n)]
+
+
+def build_seed_brief(report: dict, keyword: str, country: str) -> str:
+    """Render a starter brief (YAML text) seeded from a research report.
+
+    The copy fields are paraphrased placeholders that cite the winning pattern
+    and link to competitor ads; the user rewrites them in their own voice.
+    """
+    country = country.upper()
+    ctas = report.get("patterns", {}).get("dominant_ctas", []) or []
+    dom_cta_text = ctas[0] if ctas else None
+    meta_cta = _meta_cta(dom_cta_text)
+    themes = _themes(report)
+    theme_str = ", ".join(themes) if themes else "(no recurring themes found)"
+    winners = report.get("advertisers", [])[:3]
+    top_ads = report.get("top_ads", [])[:3]
+
+    header = [
+        f"# adkit brief seeded from Ad Library research: '{keyword}' in {country}",
+        f"# Generated {datetime.now(timezone.utc):%Y-%m-%d}. These are STARTING POINTS derived from",
+        "# what is working in this market. Rewrite the copy in your own voice; do not copy",
+        "# competitors verbatim. Fill in the budget, targeting, and destination.",
+        "#",
+        f"# Recurring themes in top ads: {theme_str}",
+        f"# Most common CTA/headline seen: {dom_cta_text or '(none)'}",
+    ]
+    if winners:
+        header.append("# Top advertisers (by longevity x variants):")
+        for adv in winners:
+            header.append(
+                f"#   - {adv['advertiser']} "
+                f"({adv['variants']} variants, up to {adv['longest_run_days']}d)"
+            )
+    if top_ads:
+        header.append("# Study these long-running ads:")
+        for ad in top_ads:
+            if ad.get("snapshot_url"):
+                header.append(f"#   {ad['days_running']}d  {ad['snapshot_url']}")
+
+    body = f"""
+account: null
+page: null
+creatives_dir: creatives
+
+campaign:
+  name: "{keyword.title()} | Research-seeded"
+  objective: OUTCOME_TRAFFIC        # switch to OUTCOME_LEADS for an Instant Form
+
+adsets:
+  - name: "{country} | {keyword} audience"
+    daily_budget: 20000             # minor units; set to your budget (20000 = 200.00)
+    countries: [{country}]
+    age_min: 25
+    age_max: 55
+    interest_ids: []                # find IDs with: adkit targeting search "{keyword}"
+    optimization_goal: LINK_CLICKS
+    destination_type: WEBSITE
+    ads:
+      - name: "Angle 1"
+        # Winning ads here lead with: {theme_str}
+        message: "REWRITE: your hook for {keyword} buyers in {country}, in your own voice."
+        headline: "REWRITE: your promise in 4-6 words"
+        link: "https://your-site.com"
+        cta: {meta_cta}             # most common competitor CTA was: {dom_cta_text or 'n/a'}
+        generate:
+          type: image               # switch to video (aspect 9:16) for Reels/Stories
+          prompt: "On-brand ad for {keyword} in {country}, bold headline, clean modern look, angle: {theme_str}"
+          aspect: "1:1"
+
+      - name: "Angle 2"
+        message: "REWRITE: a second, different angle (e.g. proof, urgency, or outcome)."
+        headline: "REWRITE: a sharper second hook"
+        link: "https://your-site.com"
+        cta: {meta_cta}
+        generate:
+          type: image
+          prompt: "Alternative ad concept for {keyword}, different visual, same offer"
+          aspect: "1:1"
+"""
+    return "\n".join(header) + "\n" + body.lstrip("\n")
+
+
+# --------------------------------------------------------------------------- #
+# Soft "did you research first?" nudge. State lives in a small cache marker so
+# the tip only shows when research was not run recently. Never blocks anything.
+# --------------------------------------------------------------------------- #
+_TRUTHY = {"1", "true", "yes", "on"}
+
+
+def _cache_path() -> Path:
+    base = os.environ.get("XDG_CACHE_HOME") or str(Path.home() / ".cache")
+    return Path(base) / "adkit" / "last_research.json"
+
+
+def record_research(keyword: str, country: str) -> None:
+    path = _cache_path()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps({
+        "keyword": keyword, "country": country,
+        "ts": datetime.now(timezone.utc).isoformat(),
+    }))
+
+
+def recent_research(max_age_days: int = 30) -> dict | None:
+    path = _cache_path()
+    if not path.exists():
+        return None
+    try:
+        data = json.loads(path.read_text())
+        ts = datetime.fromisoformat(data["ts"])
+    except (ValueError, KeyError, OSError):
+        return None
+    if ts.tzinfo is None:
+        ts = ts.replace(tzinfo=timezone.utc)
+    if (datetime.now(timezone.utc) - ts).days > max_age_days:
+        return None
+    return data
+
+
+def research_reminder() -> str | None:
+    """One-line, suppressible nudge to research before making creatives.
+    Returns None if tips are silenced or research was run recently."""
+    if os.environ.get("ADKIT_NO_TIPS", "").strip().lower() in _TRUTHY:
+        return None
+    if recent_research():
+        return None
+    return (
+        "Tip: base creatives on what's already working, look at winning ads first:\n"
+        "     adkit research --keyword \"<your category>\" --country <cc>   (silence: ADKIT_NO_TIPS=1)"
+    )

@@ -68,6 +68,11 @@ def launch(brief, go):
             click.echo(f"    ad: {ad['name']}  [{ad['media']}]  cta={ad['cta']}{tag}")
 
     if not go:
+        if any(ad["will_generate"] for aset in plan["adsets"] for ad in aset["ads"]):
+            from ..research import research_reminder
+            tip = research_reminder()
+            if tip:
+                click.echo("\n" + tip)
         click.echo(
             "\nDry run complete. Nothing was created and no creative was generated.\n"
             "Re-run with --go to build it (all objects start PAUSED)."

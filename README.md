@@ -139,6 +139,15 @@ adkit research --keyword "edtech" --country IN
 
 adkit pulls matching ads from Meta's **official Ad Library API** (not scraping, which violates Meta's Terms), then ranks advertisers by **how long and how widely they run** their ads. Meta does not expose impressions or spend for commercial ads, so longevity and variant count are the honest proxy: advertisers kill losers fast, so a long-running, heavily-varied ad is almost certainly a winner. You get the winning advertisers, their longest-running ads (with snapshot links to view), and the common hooks, offers, CTAs, and placements, so you can design your ad from what's proven.
 
+Turn the findings straight into a starter brief, so research feeds your creative:
+
+```bash
+adkit research --keyword "edtech" --country IN --seed-brief edtech.yaml
+# then edit the copy and: adkit automate launch --brief edtech.yaml
+```
+
+Research is meant to come **before you make creatives**. `adkit generate` and `automate` print a gentle one-line reminder if you haven't researched recently (silence it with `ADKIT_NO_TIPS=1`), and the Claude Code skill runs research as step one.
+
 First use requires a one-time identity confirmation and terms acceptance at [facebook.com/ads/library/api](https://www.facebook.com/ads/library/api); adkit tells you if it's not set up yet. API coverage of non-EU commercial ads can be sparse; the public Ad Library website is the manual fallback.
 
 ## The brief

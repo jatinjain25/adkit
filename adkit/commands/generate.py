@@ -3,6 +3,13 @@ from pathlib import Path
 import click
 
 from .. import creative_gen
+from ..research import research_reminder
+
+
+def _nudge():
+    tip = research_reminder()
+    if tip:
+        click.echo(tip)
 
 
 @click.group()
@@ -33,6 +40,7 @@ def generate():
 )
 def image(prompt, out, aspect, size):
     """Generate a still ad image from a text prompt."""
+    _nudge()
     click.echo(f"[~${creative_gen.COST_IMAGE:.2f}] image -> {out}")
     try:
         path = creative_gen.generate_image(prompt, out, aspect=aspect, size=size)
@@ -77,6 +85,7 @@ def image(prompt, out, aspect, size):
 )
 def video(prompt, out, seed_image, duration, aspect, quality):
     """Generate a short ad video. Fast model by default to control cost."""
+    _nudge()
     dur = int(duration)
     est = creative_gen.COST_VIDEO.get(dur, creative_gen.COST_VIDEO[8])
     click.echo(f"[~${est:.2f}] {dur}s video ({'quality' if quality else 'fast'}) -> {out}")

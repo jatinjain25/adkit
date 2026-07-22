@@ -13,6 +13,13 @@ versioning.
   summarizes winning hooks, offers, CTAs, and placements. This is the front of the
   flow (Research → Brief → Creative → Build → Launch → Optimize). Uses the
   sanctioned API, never scraping.
+- `adkit research --seed-brief <file>`: writes a starter brief seeded from the
+  winning patterns (dominant CTA, recurring themes, a `generate:` creative prompt,
+  and competitor snapshot links to study), connecting research directly to creative.
+- Research-first nudges: `adkit generate` and `adkit automate` print a one-line,
+  suppressible reminder (`ADKIT_NO_TIPS=1`) to research before making creatives when
+  none was run recently; the Claude Code skill, slash commands, and onboarding now
+  put research as step one.
 
 ## [0.1.1]
 

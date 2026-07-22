@@ -1,4 +1,5 @@
 import json as _json
+from pathlib import Path
 
 import click
 
@@ -28,7 +29,13 @@ from .. import research as research_lib
 )
 @click.option("--limit", type=int, default=100, show_default=True, help="Max ads to pull.")
 @click.option("--json", "as_json", is_flag=True, default=False, help="Emit the raw report as JSON.")
-def research(keyword, country, active_status, media_type, limit, as_json):
+@click.option(
+    "--seed-brief",
+    type=click.Path(dir_okay=False, path_type=Path),
+    default=None,
+    help="Also write a starter campaign brief seeded from the findings (research -> brief -> creative).",
+)
+def research(keyword, country, active_status, media_type, limit, as_json, seed_brief):
     """Research competitor ads in the Ad Library (the start of the flow).
 
     Finds ads for a category in a country, ranks advertisers by how long and how
@@ -41,6 +48,16 @@ def research(keyword, country, active_status, media_type, limit, as_json):
         )
     except research_lib.AdLibraryAccessError as e:
         raise SystemExit(str(e))
+
+    # Record that research happened so the "did you research first?" nudge stays quiet.
+    research_lib.record_research(keyword, country)
+
+    if seed_brief is not None:
+        if seed_brief.exists():
+            raise SystemExit(f"{seed_brief} already exists; choose another path or delete it first.")
+        seed_brief.write_text(research_lib.build_seed_brief(report, keyword, country))
+        click.echo(f"  ✓ wrote research-seeded brief: {seed_brief}")
+        click.echo(f"    Edit the copy, then: adkit automate launch --brief {seed_brief}")
 
     if as_json:
         click.echo(_json.dumps(report, indent=2))
